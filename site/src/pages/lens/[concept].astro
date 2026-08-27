@@ -1,0 +1,58 @@
+---
+// One concept per questionnaire -- kept small on purpose, not combined
+// across all tracked concepts, so it never grows overwhelming as more
+// concepts accumulate real comparison data (spec.md 3.2, "עדשה נגזרת ממשתמש").
+export async function getStaticPaths() {
+  const files = import.meta.glob("../../data/*.json", { eager: true });
+  return Object.entries(files)
+    .filter(([path]) => !path.endsWith("index.json"))
+    .map(([, mod]) => {
+      const data = (mod as any).default ?? mod;
+      return { params: { concept: data.concept }, props: { data } };
+    });
+}
+
+const { data } = Astro.props as { data: any };
+const dataJson = JSON.stringify(data);
+---
+
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>העדשה שלך — {data.concept}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+      .question { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+      .question p { font-weight: bold; margin-top: 0; }
+      button.opt {
+        margin: 0.25rem; padding: 0.5rem 1rem; border: 1px solid #999; border-radius: 6px;
+        background: white; cursor: pointer;
+      }
+      button.opt.selected { background: #333; color: white; border-color: #333; }
+      #result { margin-top: 2rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; display: none; }
+      table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+      th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: start; font-size: 0.9rem; }
+      .note { color: #555; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <p><a href={`/concepts/${data.concept}`}>&larr; חזרה לדף המושג</a></p>
+    <h1>העדשה שלך — מושג: {data.concept}</h1>
+    <p class="note">
+      ענה על כמה שאלות. שום דבר לא נשמר או נשלח לשום מקום — הכל רץ אצלך בדפדפן, ורואים רק אתה.
+      אין תשובה "נכונה" — המערכת לא שופטת כיוון, רק את המבנה של איך אתה חושב על המושג הזה.
+    </p>
+
+    <div id="page1"></div>
+    <button id="next-page" class="opt" style="margin-top:1rem;">המשך לשאלות הבאות</button>
+
+    <div id="page2" style="display:none;"></div>
+    <button id="compute" class="opt" style="margin-top:1rem; display:none;">חשב את העדשה שלי</button>
+
+    <div id="result"></div>
+
+    <script type="application/json" id="lens-data" set:html={dataJson} />
+    <script type="module" src="/src/scripts/user-lens.ts"></script>
+  </body>
+</html>

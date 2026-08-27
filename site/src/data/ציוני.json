@@ -1,0 +1,76 @@
+{
+  "concept": "ציוני",
+  "claims": [
+    {
+      "id": "clm_00002",
+      "speaker": "בנימין גנץ",
+      "text_he": "לבן גביר מצביעים ציוניים רבים, מנסור עבאס הוא לא ציוני",
+      "context_before": "בתשובה לשאלת העיתונאי יהודה שלזינגר:",
+      "context_after": "",
+      "date": "2026-01-19",
+      "grammatical_form": "mixed",
+      "source_medium": "video",
+      "source_platform": "instagram",
+      "source_url": "https://www.instagram.com/p/DTsVSCNCv5I/",
+      "source_status": "live"
+    },
+    {
+      "id": "clm_00001",
+      "speaker": "יאיר גולן",
+      "text_he": "מנסור עבאס יותר ציוני מסמוטריץ', יותר ציוני מבן גביר ויותר ציוני מהחרדים",
+      "context_before": "בכנס יום הדמוקרטיה 2026 באוניברסיטת רייכמן, בשיח עם הסטודנט גיא שלום, אמר גולן:",
+      "context_after": "",
+      "date": "2026-01-22",
+      "grammatical_form": "adjective",
+      "source_medium": "text",
+      "source_platform": "news_site",
+      "source_url": "https://hamal.co.il/main/יאיר-גולן-בעיניי-239552",
+      "source_status": "live"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_00001",
+      "claim_id": "clm_00001",
+      "relation": "gt",
+      "subject": "מנסור עבאס",
+      "object": "בצלאל סמוטריץ'"
+    },
+    {
+      "id": "evt_00002",
+      "claim_id": "clm_00001",
+      "relation": "gt",
+      "subject": "מנסור עבאס",
+      "object": "איתמר בן גביר"
+    },
+    {
+      "id": "evt_00003",
+      "claim_id": "clm_00002",
+      "relation": "not_in_class",
+      "subject": "מנסור עבאס",
+      "object": null
+    }
+  ],
+  "classifications": [
+    {
+      "speaker": "יאיר גולן",
+      "form": "adjective",
+      "classification": "strict_order_partial",
+      "universe": [
+        "בצלאל סמוטריץ'",
+        "מנסור עבאס",
+        "איתמר בן גביר"
+      ],
+      "violation_count": 0
+    },
+    {
+      "speaker": "בנימין גנץ",
+      "form": "mixed",
+      "classification": "equivalence",
+      "universe": [
+        "מנסור עבאס"
+      ],
+      "violation_count": 0
+    }
+  ]
+}

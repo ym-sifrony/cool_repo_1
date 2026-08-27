@@ -1,0 +1,141 @@
+---
+export async function getStaticPaths() {
+  const files = import.meta.glob("../../data/*.json", { eager: true });
+  return Object.entries(files)
+    .filter(([path]) => !path.endsWith("index.json"))
+    .map(([, mod]) => {
+      const data = mod.default ?? mod;
+      return { params: { concept: data.concept }, props: { data } };
+    });
+}
+
+const { data } = Astro.props;
+const { concept, claims, events, classifications } = data;
+
+const relationLabel: Record<string, string> = {
+  gt: "יותר",
+  eq_ordinal: "שווה ל",
+  in_class: "בקטגוריה",
+  not_in_class: "לא בקטגוריה",
+};
+
+const classificationLabel: Record<string, string> = {
+  equivalence: "יחס שקילות",
+  strict_order_total: "יחס סדר מלא",
+  strict_order_partial: "יחס סדר חלקי",
+  weak_order: "יחס סדר עם שוויונות",
+  no_discourse: "אין מספיק נתונים",
+  inconsistent: "חוסר עקביות",
+};
+---
+
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>מושג: {concept}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 780px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.6;
+      }
+      h1 { font-size: 2rem; }
+      section { margin-bottom: 2.5rem; }
+      .claim {
+        border-inline-start: 3px solid #ccc;
+        padding-inline-start: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .claim blockquote {
+        margin: 0.25rem 0;
+        font-size: 1.1rem;
+      }
+      .meta {
+        font-size: 0.85rem;
+        color: #555;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        background: #eee;
+        margin-inline-end: 0.35rem;
+      }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 0.4rem 0.6rem;
+        text-align: start;
+        font-size: 0.9rem;
+      }
+      th { background: #f5f5f5; }
+    </style>
+  </head>
+  <body>
+    <p><a href="/">&larr; כל המושגים</a></p>
+    <h1>מושג: {concept}</h1>
+    <p><a href={`/lens/${concept}`}>גלה את העדשה שלך על המושג הזה &larr;</a></p>
+
+    <section>
+      <h2>סיווג לפי דובר (L2.1)</h2>
+      <table>
+        <thead>
+          <tr><th>דובר</th><th>סיווג</th><th>יקום</th><th>הפרות</th></tr>
+        </thead>
+        <tbody>
+          {classifications.map((c: any) => (
+            <tr>
+              <td>{c.speaker}</td>
+              <td>{classificationLabel[c.classification] ?? c.classification}</td>
+              <td>{c.universe.join(", ")}</td>
+              <td>{c.violation_count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>אירועים (קשתות בגרף)</h2>
+      <table>
+        <thead>
+          <tr><th>נשוא</th><th>יחס</th><th>מושא</th></tr>
+        </thead>
+        <tbody>
+          {events.map((e: any) => (
+            <tr>
+              <td>{e.subject}</td>
+              <td>{relationLabel[e.relation] ?? e.relation}</td>
+              <td>{e.object ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>כל הטענות</h2>
+      {claims.map((c: any) => (
+        <div class="claim">
+          <blockquote>
+            {c.context_before && <span class="meta">{c.context_before} </span>}
+            &ldquo;{c.text_he}&rdquo;
+          </blockquote>
+          <div class="meta">
+            <span class="badge">{c.speaker}</span>
+            <span class="badge">{c.date}</span>
+            <span class="badge">{c.grammatical_form ?? "לא סווג"}</span>
+            <span class="badge">{c.source_medium}/{c.source_platform}</span>
+            {" "}
+            <a href={c.source_url} target="_blank" rel="noopener">מקור</a>
+            {c.source_status !== "live" && <span class="badge">מקור: {c.source_status}</span>}
+          </div>
+        </div>
+      ))}
+    </section>
+  </body>
+</html>

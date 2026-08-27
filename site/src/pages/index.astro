@@ -1,0 +1,31 @@
+---
+import conceptIndex from "../data/index.json";
+---
+
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>מיפוי תפיסות עולם</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 780px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      ul { line-height: 2; }
+    </style>
+  </head>
+  <body>
+    <h1>מושגים</h1>
+    <ul>
+      {conceptIndex.map((c: { concept: string; claim_count: number }) => (
+        <li>
+          <a href={`/concepts/${c.concept}`}>{c.concept}</a>
+          {" "}({c.claim_count} טענות)
+        </li>
+      ))}
+    </ul>
+  </body>
+</html>

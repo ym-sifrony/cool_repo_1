@@ -89,6 +89,25 @@ class TestGenderedSingularAgreement(unittest.TestCase):
         self.assertEqual(result, [("נורמלית", "noun")])
 
 
+class TestSofitLetterRegularization(unittest.TestCase):
+    def test_neeman_feminine_form_uses_regular_not_final_nun(self):
+        # naive concatenation gives "נאמןה" (keeps sofit ן mid-word, not a
+        # real word) instead of "נאמנה" -- found by auditing every one of
+        # the 24 approved concepts' generated forms, not a hypothetical.
+        # "נאמן" was effectively unsearchable in any inflected form at all
+        # before this fix.
+        self.assertEqual(
+            forms("ידידות נאמנה", "נאמן"),
+            [("נאמנה", "adjective")],
+        )
+
+    def test_neeman_plural_also_regularized(self):
+        self.assertEqual(
+            forms("חברים נאמנים", "נאמן"),
+            [("נאמנים", "adjective")],
+        )
+
+
 class TestParticipleFeminineForm(unittest.TestCase):
     def test_tzodeket_not_tzodeka(self):
         # "צודק" is a פועל-pattern participle (correct/right) -- its real

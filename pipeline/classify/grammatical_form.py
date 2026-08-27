@@ -19,16 +19,31 @@ COPULA_WORDS = {"הוא", "היא", "הם", "הן"}
 PLURAL_SUFFIXES = ("ים", "ות")
 
 
+SOFIT_TO_REGULAR = {"ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ"}
+
+
+def _regularize_final_letter(stem: str) -> str:
+    """Hebrew final-letter forms (ך/ם/ן/ף/ץ) are only valid at the actual end
+    of a word -- appending a suffix moves that letter to a non-final position,
+    so it must convert to its regular form first (e.g. "נאמן" + "ה" needs to
+    be "נאמנה", not the non-word "נאמןה" naive concatenation would produce).
+    Found by auditing every concept's generated forms, not a hypothetical:
+    "נאמן" was effectively unsearchable in any inflected form because of this."""
+    if stem and stem[-1] in SOFIT_TO_REGULAR:
+        return stem[:-1] + SOFIT_TO_REGULAR[stem[-1]]
+    return stem
+
+
 def inflected_forms(base: str) -> list[str]:
     """Plausible surface forms of a masc.sg. Hebrew adjective (mechanical, not
     a full morphological analyzer)."""
     forms = {base}
     if base.endswith("י"):
-        stem = base[:-1]
+        stem = _regularize_final_letter(base[:-1])
         # both "ים"/"יים" plurals occur in real usage (e.g. קיצונים AND קיצוניים)
         forms |= {stem + "ית", stem + "יים", stem + "יות", stem + "ים"}
     elif base.endswith("ון"):
-        stem = base[:-2]
+        stem = _regularize_final_letter(base[:-2])
         forms |= {stem + "ונה", stem + "ונים", stem + "ונות"}
     else:
         # both suffixes generated regardless of which is "real" for this
@@ -36,7 +51,8 @@ def inflected_forms(base: str) -> list[str]:
         # "+ה" rule would give -- it's a פועל-pattern participle, not a plain
         # adjective like "נאמן"/"ישר"). The wrong one just never matches real
         # text ("נאמנת" isn't a word), so over-generating here is free.
-        forms |= {base + "ה", base + "ת", base + "ים", base + "ות"}
+        stem = _regularize_final_letter(base)
+        forms |= {stem + "ה", stem + "ת", stem + "ים", stem + "ות"}
     return sorted(forms, key=len, reverse=True)
 
 

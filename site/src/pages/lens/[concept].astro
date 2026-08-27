@@ -13,7 +13,16 @@ export async function getStaticPaths() {
 }
 
 const { data } = Astro.props as { data: any };
-const dataJson = JSON.stringify(data);
+// data.claims includes scraped text_he/context_before/context_after -- real
+// text from external sources, not authored by us. JSON.stringify does NOT
+// escape "</script>", so a claim containing that literal substring (from a
+// real article/Telegram post) would close this script tag early and let
+// arbitrary HTML/JS run in every visitor's browser (stored XSS). Escaping
+// "<" is the standard fix for JSON-in-inline-script (same technique used by
+// Next.js/Rails for this exact pattern) -- safe because valid JSON never
+// needs a literal "<" outside a string, and "<" round-trips identically
+// through JSON.parse.
+const dataJson = JSON.stringify(data).replace(/</g, "\\u003c");
 ---
 
 <html lang="he" dir="rtl">

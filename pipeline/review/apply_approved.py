@@ -25,12 +25,33 @@ than a rephrasing of "not X" (spec.md L2.1) -- never inferred mechanically.
 """
 import hashlib
 import json
+import os
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "concepts.db"
 QUEUE_PATH = Path(__file__).resolve().parents[1] / "review_queue" / "candidates.json"
+
+
+def reviewer_identity() -> str:
+    """A hardcoded 'manual-approval-queue' string was previously written for
+    every claim regardless of who actually reviewed it -- indistinguishable
+    from a spoofed/automated approval, no real accountability trail. Reading
+    this from the environment isn't strong (real accountability belongs to
+    the GitHub-PR-based review flow, spec.md's security section -- not yet
+    built), but it's a genuine improvement over a static placeholder at zero
+    cost, and refusing to guess a name is safer than fabricating one."""
+    name = os.environ.get("REVIEWER_NAME")
+    if not name:
+        sys.exit(
+            "REVIEWER_NAME environment variable is not set -- refusing to "
+            "record a fake reviewer identity. Set it to your own name/handle "
+            "before running this script, e.g.:\n"
+            "  REVIEWER_NAME=\"your name\" python apply_approved.py"
+        )
+    return name
 
 
 def checksum(text: str) -> str:
@@ -58,6 +79,7 @@ def main() -> None:
         print("nothing marked approved: true -- edit candidates.json first")
         return
 
+    reviewer = reviewer_identity()
     conn = sqlite3.connect(DB_PATH)
     inserted = 0
     for c in approved:
@@ -83,7 +105,7 @@ def main() -> None:
                 "context_after": c["context_after"], "claim_date": c["claim_date"],
                 "source_platform": c["source_platform"], "article_url": c["article_url"],
                 "retrieved_at": now_iso(), "checksum": checksum(c["text_he"]),
-                "reviewed_by": "manual-approval-queue",
+                "reviewed_by": reviewer,
                 "form": c.get("concept_grammatical_form"),
                 "visible": 1 if c.get("visible", True) else 0,
             },

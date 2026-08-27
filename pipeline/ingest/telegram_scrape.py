@@ -183,10 +183,13 @@ def queue_for_human_review(username: str, posts: list[TelegramPost]) -> int:
 if __name__ == "__main__":
     from dataclasses import asdict
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from concepts import CONCEPTS  # noqa: E402
+
     conn = sqlite3.connect(DB_PATH)
     registry = load_registry(conn)
     name_to_id = load_persons(conn)
-    concepts = [r[0] for r in conn.execute("SELECT DISTINCT concept FROM claims")]
+    concepts = CONCEPTS
     conn.close()
 
     all_candidates: list[Candidate] = []

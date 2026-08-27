@@ -149,11 +149,13 @@ def merge_into_queue(new_candidates: list[dict], queue_path: Path = QUEUE_PATH) 
 if __name__ == "__main__":
     from dataclasses import asdict
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from concepts import CONCEPTS  # noqa: E402
     from news_rss import fetch_all_articles, fetch_article_text
 
     conn = sqlite3.connect(DB_PATH)
     name_to_id = load_persons(conn)
-    concepts = [r[0] for r in conn.execute("SELECT DISTINCT concept FROM claims")]
+    concepts = CONCEPTS
     conn.close()
 
     all_candidates: list[Candidate] = []

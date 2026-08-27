@@ -1,5 +1,6 @@
 pipeline/db/*.db
 pipeline/review_queue/
+pipeline/crawl_log.txt
 __pycache__/
 *.pyc
 .env

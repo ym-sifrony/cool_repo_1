@@ -1,6 +1,14 @@
 """Export claims/events/classification snapshots to JSON for the Astro site to
 read at build time. The site never queries SQLite directly -- this is the one
-bridge between the pipeline (private repo, eventually) and the site (public repo).
+bridge between the DB (never committed, .gitignore'd) and the static files
+that ship in the build.
+
+Repo layout decided later than this comment originally said: one repo
+(pipeline/ + site/ together), kept Private on GitHub -- not the earlier
+two-repo private-pipeline/public-site split. The deployed SITE is still
+fully public (via Vercel/Cloudflare Pages reading the private repo with
+read-only access); it's the source repo that stays closed. See spec.md's
+security section.
 """
 import json
 import sqlite3

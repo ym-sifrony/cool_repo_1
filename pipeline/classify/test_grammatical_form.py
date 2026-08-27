@@ -89,6 +89,39 @@ class TestGenderedSingularAgreement(unittest.TestCase):
         self.assertEqual(result, [("נורמלית", "noun")])
 
 
+class TestConstructPluralHead(unittest.TestCase):
+    def test_anshei_miktzoa_tzioniim(self):
+        # "אנשי מקצוע ציוניים" -- the concept agrees with "אנשי" (people-of),
+        # two words back, not the directly-adjacent "מקצוע" (profession,
+        # singular). Found on a real registered official Telegram channel's
+        # post (Smotrich), not synthetic.
+        self.assertEqual(
+            forms("נציב אנשי מקצוע ציוניים בעמדות המפתח", "ציוני"),
+            [("ציוניים", "adjective")],
+        )
+
+
+class TestPrepositionHeadedPluralNoun(unittest.TestCase):
+    def test_layehudim_is_nominal_group_reference(self):
+        # "ליהודים" (to/for Jews) -- no definite article at all, just a bare
+        # plural after a preposition, but still reliably a nominal group
+        # reference, not an adjective. Real sentence from Smotrich's channel.
+        self.assertEqual(
+            forms("יש ביטחון ליהודים", "יהודי"),
+            [("יהודים", "noun")],
+        )
+
+    def test_mehademokratim_preceded_by_a_name_not_a_noun(self):
+        # "מהדמוקרטים" (from the Democrats) -- preceded by a proper name
+        # ("רדמן"), which structurally can't take an adjective modifier at
+        # all, so the old "ה"-nominalization rule's cannot_be_modifying_a_noun
+        # guard (only את/clause-start) wrongly missed this. Real sentence.
+        self.assertEqual(
+            forms("תקשיבו למשה רדמן מהדמוקרטים", "דמוקרטי"),
+            [("דמוקרטים", "noun")],
+        )
+
+
 class TestSofitLetterRegularization(unittest.TestCase):
     def test_neeman_feminine_form_uses_regular_not_final_nun(self):
         # naive concatenation gives "נאמןה" (keeps sofit ן mid-word, not a

@@ -1,11 +1,19 @@
 """Mechanical detection of concept_grammatical_form (spec.md L2.1): noun vs
-adjective, via two syntactic tests -- never semantic interpretation.
+adjective, via syntactic tests -- never semantic interpretation.
 
-  1. Comparative attachment: "יותר [concept]" -> adjective;
-     "[concept] [other-word] יותר" -> noun (יותר attaches to the OTHER word).
+  1. Comparative attachment: "יותר [concept]" or "[concept] יותר" -> adjective
+     (both orders); "[concept] [other-word] יותר" -> noun (יותר attaches to
+     the OTHER word).
   2. Morphological agreement: [concept] inflected to agree in number/gender
-     with an immediately preceding noun it modifies -> adjective.
-  3. Bare predicative fallback ("הוא/אינו + [concept]", no comparison): noun
+     with a preceding noun it modifies -> adjective. Includes construct-plural
+     group heads ("אנשי X", two words back, not the directly-adjacent word)
+     and gendered-singular agreement ("מדינה נורמלית").
+  3. Preposition-headed plural ("לחכמים", "מהדמוקרטים") -> noun: a preposition
+     attaches to a noun phrase, so a plural concept-form directly carrying one
+     is nominalized regardless of what precedes it.
+  4. Definite article, standalone after "את"/clause-start -> noun (nominalized
+     category, not agreement with a modifiable preceding noun).
+  5. Bare predicative fallback ("הוא/אינו + [concept]", no comparison): noun
      by declared convention (spec.md L2.1), not derived.
 
 Everything this can't resolve returns None ("ambiguous") -- automated output,
@@ -17,6 +25,19 @@ from dataclasses import dataclass
 NEGATION_WORDS = {"לא", "אינו", "אינה", "אינם", "אינן"}
 COPULA_WORDS = {"הוא", "היא", "הם", "הן"}
 PLURAL_SUFFIXES = ("ים", "ות")
+
+# Construct-plural (סמיכות) head nouns for politically-relevant GROUPS --
+# "אנשי מקצוע ציוניים" agrees with "אנשי" (people-of), two words back, not
+# with the directly-preceding "מקצוע" (profession, singular). Construct
+# plurals end in "-י", not "-ים"/"-ות", so PLURAL_SUFFIXES can't see them
+# either way. Deliberately scoped to group/political-actor nouns, not
+# general Hebrew construct-state parsing -- found on real registered-channel
+# data, expected to grow as more real examples turn up (spec.md's own
+# "gilui munah-netunim" principle: expand from data, not upfront guessing).
+CONSTRUCT_PLURAL_HEADS = {
+    "אנשי", "חברי", "ראשי", "נציגי", "תומכי", "פעילי", "בוחרי",
+    "מנהיגי", "עסקני", "שרי", "בני",
+}
 
 
 SOFIT_TO_REGULAR = {"ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ"}
@@ -115,9 +136,25 @@ def find_occurrences(text: str, concept: str) -> list[Occurrence]:
         is_negation_or_copula = any(
             _strip_prefix(before_word, w) for w in NEGATION_WORDS | COPULA_WORDS
         )
-        if before_word and not is_negation_or_copula and p_plural and c_plural:
-            results.append(Occurrence(matched_word, start, "adjective",
-                                       f"agrees in number with preceding '{before_word}'"))
+        construct_head = before_words[-2] if len(before_words) >= 2 else None
+        p_construct_plural = construct_head in CONSTRUCT_PLURAL_HEADS
+        if before_word and not is_negation_or_copula and c_plural and (p_plural or p_construct_plural):
+            reason = (f"agrees in number with preceding '{before_word}'" if p_plural else
+                      f"agrees in number with construct-plural head '{construct_head} {before_word}'")
+            results.append(Occurrence(matched_word, start, "adjective", reason))
+            continue
+
+        # preposition-headed plural: ב/כ/ל/מ (with or without glued "ה")
+        # directly on a PLURAL concept-form is reliably nominal -- a
+        # preposition attaches to a noun phrase, and Hebrew regularly
+        # nominalizes plural adjectives this way ("לחכמים", "מהדמוקרטים",
+        # "ליהודים") even with no definite article at all. Generalizes the
+        # "ה"-nominalization rule below to also cover a preceding proper name
+        # (which structurally can't take an adjective modifier in the first
+        # place) -- found on real registered-channel data, not hypothetical.
+        if c_plural and any(ch in "בכלמ" for ch in prefix):
+            results.append(Occurrence(matched_word, start, "noun",
+                                       f"preposition-headed plural ('{prefix}{matched_word}') -> nominalized"))
             continue
 
         # Plural agreement (above) is the RARER case -- most nouns appear in

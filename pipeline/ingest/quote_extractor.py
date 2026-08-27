@@ -15,7 +15,7 @@ from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "classify"))
-from grammatical_form import claim_level_form, find_occurrences, inflected_forms  # noqa: E402
+from grammatical_form import claim_level_form, find_occurrences  # noqa: E402
 
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "concepts.db"
 CONTEXT_WINDOW_CHARS = 120
@@ -71,12 +71,15 @@ def resolve_speaker(name_guess: str, name_to_id: dict[str, int]) -> tuple[str, i
 
 
 def matching_concepts(text: str, concepts: list[str]) -> list[str]:
-    hits = []
-    for concept in concepts:
-        forms = inflected_forms(concept)
-        if any(re.search(r"\b" + re.escape(f) + r"\b", text) for f in forms):
-            hits.append(concept)
-    return hits
+    """Delegates to find_occurrences (not a separate \\b-based regex) so a
+    concept is only ever flagged as a candidate if find_occurrences can ALSO
+    locate and attempt to classify the same span. \\b alone matched a hyphen
+    as a word boundary, so "אנטי-ציוניים" created a candidate tagged concept
+    "ציוני" with concept_grammatical_form always None -- find_occurrences
+    correctly declines a hyphen (not whitespace) as a real boundary, since
+    compound anti-X forms are deliberately not auto-extracted yet (spec.md
+    L2.1, anti_class). Found from a real candidate, not a hypothetical."""
+    return [concept for concept in concepts if find_occurrences(text, concept)]
 
 
 def surrounding_context(article_text: str, span: tuple[int, int]) -> tuple[str, str]:

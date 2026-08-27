@@ -25,6 +25,15 @@ class TestComparative(unittest.TestCase):
             [("קיצוני", "adjective")],
         )
 
+    def test_post_modifier_more_is_also_adjective(self):
+        # "צודק יותר" (more correct) is the same comparison as "יותר צודק",
+        # just with יותר AFTER the concept -- both orders are standard
+        # Hebrew, only the pre-modifier order was originally handled.
+        self.assertEqual(
+            forms("צודק יותר", "צודק"),
+            [("צודק", "adjective")],
+        )
+
 
 class TestBarePredicative(unittest.TestCase):
     def test_negation_is_noun_by_convention(self):
@@ -78,6 +87,18 @@ class TestGenderedSingularAgreement(unittest.TestCase):
         # phrasing; this checks the new rule's own negation guard directly.
         result = forms("זו לא נורמלית", "נורמלי")
         self.assertEqual(result, [("נורמלית", "noun")])
+
+
+class TestParticipleFeminineForm(unittest.TestCase):
+    def test_tzodeket_not_tzodeka(self):
+        # "צודק" is a פועל-pattern participle (correct/right) -- its real
+        # feminine form takes ת ("צודקת"), not the generic "+ה" rule's
+        # "צודקה", which isn't a real word. Without this, "הכי צודקת" was
+        # never even found by the regex, let alone classified.
+        self.assertEqual(
+            forms("הכי צודקת", "צודק"),
+            [("צודקת", "adjective")],
+        )
 
 
 if __name__ == "__main__":

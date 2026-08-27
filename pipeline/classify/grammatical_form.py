@@ -31,7 +31,12 @@ def inflected_forms(base: str) -> list[str]:
         stem = base[:-2]
         forms |= {stem + "ונה", stem + "ונים", stem + "ונות"}
     else:
-        forms |= {base + "ה", base + "ים", base + "ות"}
+        # both suffixes generated regardless of which is "real" for this
+        # specific word (e.g. "צודק" needs "צודקת", not the "צודקה" a plain
+        # "+ה" rule would give -- it's a פועל-pattern participle, not a plain
+        # adjective like "נאמן"/"ישר"). The wrong one just never matches real
+        # text ("נאמנת" isn't a word), so over-generating here is free.
+        forms |= {base + "ה", base + "ת", base + "ים", base + "ות"}
     return sorted(forms, key=len, reverse=True)
 
 
@@ -75,6 +80,14 @@ def find_occurrences(text: str, concept: str) -> list[Occurrence]:
         if _strip_prefix(before_word, "יותר") or _strip_prefix(before_word, "הכי"):
             results.append(Occurrence(matched_word, start, "adjective",
                                        f"comparative marker attaches directly ('{before_word}')"))
+            continue
+        # post-modifier comparative: "צודק יותר" (more correct) is the same
+        # comparison as "יותר צודק", just with יותר AFTER the concept instead
+        # of before it -- both orders are standard Hebrew, only one was
+        # handled (found by testing "צודק יותר" against the code directly).
+        if after_words and _strip_prefix(after_words[0], "יותר"):
+            results.append(Occurrence(matched_word, start, "adjective",
+                                       f"comparative marker attaches directly, post-modifier ('{after_words[0]}')"))
             continue
         if len(after_words) >= 2 and _strip_prefix(after_words[1], "יותר"):
             results.append(Occurrence(matched_word, start, "noun",

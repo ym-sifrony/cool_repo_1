@@ -62,6 +62,8 @@ const dataJson = JSON.stringify(data).replace(/</g, "\\u003c");
     <div id="result"></div>
 
     <script type="application/json" id="lens-data" set:html={dataJson} />
-    <script type="module" src="/src/scripts/user-lens.ts"></script>
+    <script>
+      import "../../scripts/user-lens.ts";
+    </script>
   </body>
 </html>

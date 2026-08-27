@@ -1,12 +1,19 @@
-"""Standing track for landmark quotes (spec.md: two separate L0 paths -- live
-forward crawl via news_rss.py/telegram_scrape.py, and this one). Every entry
-here is a real quote a human found and verified by hand against the live
-source, not something regex/llm pulled in -- that's the whole point: RSS/
-Telegram only ever see what's published from here forward, so a historically
-significant quote (like Lapid's 2022/2023 statements on קיצוני) can only ever
-get in through this file, never through the crawler. extraction_method is
-'manual' for exactly that reason -- there's no automated candidate to review,
-a human already did that job by finding and citing the source directly.
+"""Standing track for landmark quotes (spec.md: three L0 paths -- live forward
+crawl via news_rss.py, telegram_scrape.py's own live/search modes, and this
+one). Every entry here is a real quote a human found and verified by hand
+against the live source, not something regex/llm pulled in.
+
+RSS is genuinely forward-only (a feed only ever exposes its most recent
+items), so a historically significant quote from a non-Telegram source (like
+Lapid's 2022/2023 statements on קיצוני, both news sites) can only ever get in
+through this file. Telegram is different -- t.me/s/<channel>?q=<term> searches
+a channel's full archive, not just recent posts (verified live against
+t.me/s/smutrich, which returned real posts from January 2024) -- so for a
+REGISTERED Telegram channel, historical content could in principle be found
+mechanically too, not only through this manual track. extraction_method is
+'manual' here for exactly that reason -- there's no automated candidate to
+review, a human already did that job by finding and citing the source
+directly.
 
 Not a one-off seed script anymore (it started as just Golan/Gantz, spec.md's
 founding example) -- keep adding rows to CLAIMS/EVENTS below as more landmark

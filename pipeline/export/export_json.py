@@ -33,12 +33,15 @@ def entity_label(conn: sqlite3.Connection, entity_id: str | None) -> str | None:
 
 
 def export_concept(conn: sqlite3.Connection, concept: str) -> dict:
+    # visible=1 filter: a claim can be accurate (approved into `claims`) and
+    # still deliberately unpublished by a curator -- `visible` is a separate
+    # editorial gate, not a duplicate of the extraction-accuracy approval.
     claim_rows = conn.execute(
         """SELECT c.id, p.first_name, p.last_name, c.text_he, c.context_before,
                   c.context_after, c.claim_date, c.concept_grammatical_form,
                   c.source_medium, c.source_platform, c.source_url, c.source_status
            FROM claims c JOIN persons p ON p.person_id = c.person_id
-           WHERE c.concept = ?
+           WHERE c.concept = ? AND c.visible = 1
            ORDER BY c.claim_date""",
         (concept,),
     ).fetchall()
@@ -56,7 +59,7 @@ def export_concept(conn: sqlite3.Connection, concept: str) -> dict:
     events_rows = conn.execute(
         """SELECT e.id, e.claim_id, e.relation, e.subject_id, e.object_id
            FROM events e JOIN claims c ON c.id = e.claim_id
-           WHERE e.concept = ?""",
+           WHERE e.concept = ? AND c.visible = 1""",
         (concept,),
     ).fetchall()
     events = [
@@ -65,6 +68,8 @@ def export_concept(conn: sqlite3.Connection, concept: str) -> dict:
         for r in events_rows
     ]
 
+    # visible_only=True: a classification must never rest on a claim the
+    # reader can't see -- same reasoning as the claims/events filters above.
     classifications = [
         {
             "speaker": entity_label(conn, f"person:{c['person_id']}"),
@@ -72,7 +77,7 @@ def export_concept(conn: sqlite3.Connection, concept: str) -> dict:
             "universe": [entity_label(conn, u) for u in c["universe"]],
             "violation_count": len(c["violations"]),
         }
-        for c in classify_all(conn) if c["concept"] == concept
+        for c in classify_all(conn, visible_only=True) if c["concept"] == concept
     ]
 
     return {"concept": concept, "claims": claims, "events": events,

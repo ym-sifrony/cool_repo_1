@@ -8,7 +8,7 @@
       "context_before": "",
       "context_after": "אחרי מאבק ציבורי ומשפטי נמצא מסלול עוקף שיאפשר בכל זאת להציב קלפיות בחלק מהמוסדות.",
       "date": "2026-08-19",
-      "grammatical_form": "noun",
+      "grammatical_form": null,
       "source_medium": "video",
       "source_platform": "facebook",
       "source_url": "https://www.facebook.com/MeiravCohen2019/videos/2234264994078892/",
@@ -27,7 +27,7 @@
   "classifications": [
     {
       "speaker": "מירב כהן",
-      "form": "noun",
+      "form": "unknown",
       "classification": "equivalence",
       "universe": [
         "הליכוד"

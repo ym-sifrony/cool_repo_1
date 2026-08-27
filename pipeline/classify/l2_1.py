@@ -26,13 +26,19 @@ ORDER_RELATIONS = {"gt", "eq_ordinal"}
 EQUIVALENCE_RELATIONS = {"in_class", "not_in_class", "anti_class"}
 
 
-def fetch_event_groups(conn: sqlite3.Connection) -> dict:
-    """Group events by (speaker person_id, concept, grammatical_form)."""
-    rows = conn.execute(
-        """SELECT c.person_id, e.concept, c.concept_grammatical_form,
-                  e.relation, e.subject_id, e.object_id, e.id
-           FROM events e JOIN claims c ON c.id = e.claim_id"""
-    ).fetchall()
+def fetch_event_groups(conn: sqlite3.Connection, visible_only: bool = False) -> dict:
+    """Group events by (speaker person_id, concept, grammatical_form).
+    visible_only=True restricts to events whose claim is publicly visible --
+    for site export, so a displayed classification never rests on evidence
+    the reader can't see (spec.md: `visible` is a separate gate from
+    `approved`). Defaults to False so direct/research use of this module
+    (e.g. `python l2_1.py`) still sees the complete picture."""
+    query = """SELECT c.person_id, e.concept, c.concept_grammatical_form,
+                      e.relation, e.subject_id, e.object_id, e.id
+               FROM events e JOIN claims c ON c.id = e.claim_id"""
+    if visible_only:
+        query += " WHERE c.visible = 1"
+    rows = conn.execute(query).fetchall()
 
     groups = defaultdict(list)
     for person_id, concept, form, relation, subject_id, object_id, event_id in rows:
@@ -137,9 +143,9 @@ def classify_group(events: list[dict]) -> dict:
     return classify_equivalence(assignment)
 
 
-def classify_all(conn: sqlite3.Connection) -> list[dict]:
+def classify_all(conn: sqlite3.Connection, visible_only: bool = False) -> list[dict]:
     results = []
-    for (person_id, concept, form), events in fetch_event_groups(conn).items():
+    for (person_id, concept, form), events in fetch_event_groups(conn, visible_only).items():
         result = classify_group(events)
         result.update({"person_id": person_id, "concept": concept, "form": form})
         results.append(result)

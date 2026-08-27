@@ -6,6 +6,15 @@ section's review-gate rule): a human edits candidates.json, flips
 `approved: true` only after checking the quote against the real article,
 then runs this.
 
+`approved` and `visible` are two separate questions, not one: `approved`
+gates whether this even enters `claims` ("is this accurately extracted").
+`visible` (optional on a candidate, defaults to true) gates whether it shows
+on the public site once it's there ("is this worth publishing on its own").
+A claim can be fully accurate and still deliberately unpublished -- e.g. a
+grammatically "unclear" claim a curator judges confusing without more
+context. Set `"visible": false` on a candidate to keep the accurate record
+without surfacing it yet; never a reason to leave a claim unapproved.
+
 Deliberately does NOT create `events`. Event decomposition (deciding gt vs
 eq_ordinal vs in_class/not_in_class/anti_class between two specific named
 entities) from arbitrary extracted text is a harder, separate judgment call --
@@ -63,11 +72,11 @@ def main() -> None:
                 claim_date, source_medium, source_platform, source_url, source_locator,
                 source_retrieved_at, source_checksum, source_status,
                 extraction_method, extraction_confidence, reviewed_by,
-                concept_grammatical_form)
+                concept_grammatical_form, visible)
                VALUES (:id, :person_id, :concept, :text_he, :context_before, :context_after,
                        :claim_date, 'text', :source_platform, :article_url, NULL,
                        :retrieved_at, :checksum, 'live',
-                       'regex', 0.7, :reviewed_by, :form)""",
+                       'regex', 0.7, :reviewed_by, :form, :visible)""",
             {
                 "id": claim_id, "person_id": c["person_id"], "concept": c["concept"],
                 "text_he": c["text_he"], "context_before": c["context_before"],
@@ -76,10 +85,12 @@ def main() -> None:
                 "retrieved_at": now_iso(), "checksum": checksum(c["text_he"]),
                 "reviewed_by": "manual-approval-queue",
                 "form": c.get("concept_grammatical_form"),
+                "visible": 1 if c.get("visible", True) else 0,
             },
         )
         inserted += 1
-        print(f"{claim_id}: {c['text_he'][:50]}...")
+        vis_note = "" if c.get("visible", True) else " (visible=false)"
+        print(f"{claim_id}{vis_note}: {c['text_he'][:50]}...")
 
     conn.commit()
     conn.close()

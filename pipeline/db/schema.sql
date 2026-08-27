@@ -54,7 +54,13 @@ CREATE TABLE IF NOT EXISTS claims (
   source_status_checked_at TEXT,
   extraction_method     TEXT NOT NULL CHECK(extraction_method IN ('manual','regex','llm')),
   extraction_confidence  REAL,
-  reviewed_by            TEXT
+  reviewed_by            TEXT,
+  -- Separate from `approved` (candidates.json -> claims gate, "is this
+  -- accurately extracted"): visible governs "should this show on the public
+  -- site". A claim can be accurate AND deliberately not shown yet (e.g. an
+  -- "unclear"-bucket claim a curator judges confusing without more context)
+  -- -- default true, never silently drops a sourced record either way.
+  visible                BOOLEAN NOT NULL DEFAULT 1
 );
 
 -- L2.1: events (structured comparisons/assignments parsed out of a claim; graph edges)

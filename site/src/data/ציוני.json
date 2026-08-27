@@ -8,7 +8,7 @@
       "context_before": "בתשובה לשאלת העיתונאי יהודה שלזינגר:",
       "context_after": "",
       "date": "2026-01-19",
-      "grammatical_form": "mixed",
+      "grammatical_form": null,
       "source_medium": "video",
       "source_platform": "instagram",
       "source_url": "https://www.instagram.com/p/DTsVSCNCv5I/",
@@ -21,7 +21,7 @@
       "context_before": "בכנס יום הדמוקרטיה 2026 באוניברסיטת רייכמן, בשיח עם הסטודנט גיא שלום, אמר גולן:",
       "context_after": "",
       "date": "2026-01-22",
-      "grammatical_form": "adjective",
+      "grammatical_form": null,
       "source_medium": "text",
       "source_platform": "news_site",
       "source_url": "https://hamal.co.il/main/יאיר-גולן-בעיניי-239552",
@@ -54,7 +54,7 @@
   "classifications": [
     {
       "speaker": "יאיר גולן",
-      "form": "adjective",
+      "form": "unknown",
       "classification": "strict_order_partial",
       "universe": [
         "בצלאל סמוטריץ'",
@@ -65,7 +65,7 @@
     },
     {
       "speaker": "בנימין גנץ",
-      "form": "mixed",
+      "form": "unknown",
       "classification": "equivalence",
       "universe": [
         "מנסור עבאס"

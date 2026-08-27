@@ -91,6 +91,18 @@ def find_occurrences(text: str, concept: str) -> list[Occurrence]:
                                        f"agrees in number with preceding '{before_word}'"))
             continue
 
+        # Plural agreement (above) is the RARER case -- most nouns appear in
+        # singular. A gendered-singular inflection (e.g. "נורמלית", not the
+        # bare masc. base "נורמלי" and not a plural) modifying a preceding
+        # word is the far more common adjective pattern ("מדינה נורמלית")
+        # and previously fell through every rule to "ambiguous" (a real gap,
+        # found by testing real seeded quotes -- not a hypothetical).
+        is_gendered_singular_form = matched_word != concept and not c_plural
+        if before_word and not is_negation_or_copula and is_gendered_singular_form:
+            results.append(Occurrence(matched_word, start, "adjective",
+                                       f"gendered singular form agrees with preceding '{before_word}'"))
+            continue
+
         # narrow on purpose: "ה" alone doesn't mean nominalization -- an adjective
         # modifying a definite noun also takes "ה" ("זכותם הדמוקרטית"). Only fire
         # when the preceding word structurally cannot be a noun the concept modifies:

@@ -1,0 +1,25 @@
+name: tests
+
+# Required status check for branch protection on main (spec.md security
+# design): no PR can merge until this passes. Runs the same suite used
+# throughout development -- l2_1, grammatical_form, and their interaction --
+# so a change that breaks a known-good case is caught before merge, not
+# after deploy.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run pipeline test suite
+        working-directory: pipeline/classify
+        run: python -m unittest discover -p "test_*.py" -v

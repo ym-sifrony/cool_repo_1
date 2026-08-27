@@ -1,6 +1,16 @@
-"""One-off manual seed of the Golan/Gantz example (verified by hand: quotes confirmed
-against the live source pages, not auto-extracted). Demonstrates the L1 -> event
-pipeline end to end on real, sourced data before any automated extraction exists.
+"""Standing track for landmark quotes (spec.md: two separate L0 paths -- live
+forward crawl via news_rss.py/telegram_scrape.py, and this one). Every entry
+here is a real quote a human found and verified by hand against the live
+source, not something regex/llm pulled in -- that's the whole point: RSS/
+Telegram only ever see what's published from here forward, so a historically
+significant quote (like Lapid's 2022/2023 statements on קיצוני) can only ever
+get in through this file, never through the crawler. extraction_method is
+'manual' for exactly that reason -- there's no automated candidate to review,
+a human already did that job by finding and citing the source directly.
+
+Not a one-off seed script anymore (it started as just Golan/Gantz, spec.md's
+founding example) -- keep adding rows to CLAIMS/EVENTS below as more landmark
+quotes are found. Re-running main() is safe (ON CONFLICT DO NOTHING).
 """
 import hashlib
 import sqlite3

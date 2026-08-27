@@ -1,19 +1,24 @@
 """L1 rule 2 in code: a quote is only admissible if it's in explicit quotation
 marks. Regex finds quote+attribution pairs; speaker resolution against `persons`
 and concept filtering happen after, so a candidate only survives if BOTH the
-speaker and the concept are ones we actually track. Output is always a review
-candidate -- nothing here writes to `claims` directly.
+speaker and the concept are ones we actually track.
+
+Candidates always land in review_queue/candidates.json with `approved: false`.
+Nothing here writes to `claims`/`events` -- pipeline/review/apply_approved.py
+is the only thing that does, and only for entries a human flipped to `true`.
 """
+import json
 import re
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "classify"))
-from grammatical_form import inflected_forms  # noqa: E402
+from grammatical_form import claim_level_form, find_occurrences, inflected_forms  # noqa: E402
 
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "concepts.db"
+CONTEXT_WINDOW_CHARS = 120
 
 # Hebrew quotation marks in the wild: straight ", curly “ ”, gershayim ״
 QUOTE_CHARS = r"[\"“”״]"
@@ -34,10 +39,17 @@ ATTR_THEN_QUOTE = re.compile(
 @dataclass
 class Candidate:
     text_he: str
+    context_before: str
+    context_after: str
     attributed_name: str
     person_id: int | None
     concept: str
+    concept_grammatical_form: str | None
+    claim_date: str | None
+    source_platform: str
     article_url: str
+    article_title: str
+    approved: bool = field(default=False)
 
 
 def load_persons(conn: sqlite3.Connection) -> dict[str, int]:
@@ -67,7 +79,18 @@ def matching_concepts(text: str, concepts: list[str]) -> list[str]:
     return hits
 
 
-def extract_candidates(article_text: str, article_url: str,
+def surrounding_context(article_text: str, span: tuple[int, int]) -> tuple[str, str]:
+    """L1 rule 3: context_before/after are mandatory, not optional. Window-based
+    (not sentence-parsed) -- mechanical and honest about being a rough cut, not
+    linguistically precise."""
+    start, end = span
+    before = article_text[max(0, start - CONTEXT_WINDOW_CHARS):start].strip()
+    after = article_text[end:end + CONTEXT_WINDOW_CHARS].strip()
+    return before, after
+
+
+def extract_candidates(article_text: str, article_url: str, article_title: str,
+                        claim_date: str | None, source_platform: str,
                         name_to_id: dict[str, int], concepts: list[str]) -> list[Candidate]:
     candidates = []
     for pattern in (QUOTE_THEN_ATTR, ATTR_THEN_QUOTE):
@@ -81,13 +104,50 @@ def extract_candidates(article_text: str, article_url: str,
                 continue
             full_name, person_id = resolved
 
-            for concept in matching_concepts(quote, concepts):
-                candidates.append(Candidate(quote, full_name, person_id, concept, article_url))
+            hit_concepts = matching_concepts(quote, concepts)
+            if not hit_concepts:
+                continue
+
+            before, after = surrounding_context(article_text, match.span())
+
+            for concept in hit_concepts:
+                form = claim_level_form(find_occurrences(quote, concept))
+                candidates.append(Candidate(
+                    text_he=quote, context_before=before, context_after=after,
+                    attributed_name=full_name, person_id=person_id, concept=concept,
+                    concept_grammatical_form=form, claim_date=claim_date,
+                    source_platform=source_platform, article_url=article_url,
+                    article_title=article_title,
+                ))
     return candidates
 
 
+QUEUE_PATH = Path(__file__).resolve().parents[1] / "review_queue" / "candidates.json"
+
+
+def merge_into_queue(new_candidates: list[dict], queue_path: Path = QUEUE_PATH) -> int:
+    """Merges new candidates into the existing queue file instead of overwriting
+    it -- multiple sources (news_rss, telegram_scrape) now feed the same queue,
+    and a human may have partially reviewed what's already there. Dedupes on
+    (platform, url, concept, text) so re-running a source on a schedule doesn't
+    pile up the same candidate over and over."""
+    existing = json.loads(queue_path.read_text(encoding="utf-8")) if queue_path.exists() else []
+    seen = {(c.get("source_platform"), c.get("article_url"), c.get("concept"), c.get("text_he"))
+            for c in existing}
+    added = 0
+    for c in new_candidates:
+        key = (c.get("source_platform"), c.get("article_url"), c.get("concept"), c.get("text_he"))
+        if key not in seen:
+            existing.append(c)
+            seen.add(key)
+            added += 1
+    queue_path.parent.mkdir(exist_ok=True)
+    queue_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    return added
+
+
 if __name__ == "__main__":
-    import json
+    from dataclasses import asdict
 
     from news_rss import fetch_all_articles, fetch_article_text
 
@@ -96,17 +156,17 @@ if __name__ == "__main__":
     concepts = [r[0] for r in conn.execute("SELECT DISTINCT concept FROM claims")]
     conn.close()
 
-    all_candidates = []
-    for article in fetch_all_articles()[:15]:
+    all_candidates: list[Candidate] = []
+    for article in fetch_all_articles(per_feed_limit=15):
         try:
             text = fetch_article_text(article.url)
         except Exception as exc:  # noqa: BLE001
             print(f"skip {article.url}: {exc}")
             continue
-        for c in extract_candidates(text, article.url, name_to_id, concepts):
-            all_candidates.append(vars(c) | {"article_title": article.title})
+        all_candidates.extend(
+            extract_candidates(text, article.url, article.title, article.pub_date,
+                                article.platform, name_to_id, concepts)
+        )
 
-    out_path = Path(__file__).resolve().parents[1] / "review_queue" / "candidates.json"
-    out_path.parent.mkdir(exist_ok=True)
-    out_path.write_text(json.dumps(all_candidates, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"{len(all_candidates)} candidates -> {out_path}")
+    added = merge_into_queue([asdict(c) for c in all_candidates])
+    print(f"{len(all_candidates)} candidates found, {added} new -> {QUEUE_PATH}")

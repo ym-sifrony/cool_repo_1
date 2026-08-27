@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS factions (
   finish_date   TEXT
 );
 
+-- Telegram channel ownership -- manual verification only, never inferred.
+-- A wrong mapping here means a quote gets attributed to the wrong speaker,
+-- so every row must record how ownership was actually confirmed.
+CREATE TABLE IF NOT EXISTS telegram_channel_registry (
+  person_id          INTEGER NOT NULL REFERENCES persons(person_id),
+  channel_username   TEXT NOT NULL,
+  verification_note  TEXT NOT NULL,
+  verification_url   TEXT NOT NULL,
+  verified_by         TEXT NOT NULL,
+  verified_at          TEXT NOT NULL,
+  is_active             BOOLEAN NOT NULL DEFAULT 1,
+  PRIMARY KEY (person_id, channel_username)
+);
+
 -- L1: claims (documentary record; every row requires a source)
 
 CREATE TABLE IF NOT EXISTS claims (
@@ -48,7 +62,7 @@ CREATE TABLE IF NOT EXISTS claims (
 CREATE TABLE IF NOT EXISTS events (
   id                  TEXT PRIMARY KEY,
   claim_id            TEXT NOT NULL REFERENCES claims(id),
-  relation            TEXT NOT NULL CHECK(relation IN ('gt','eq_ordinal','in_class','not_in_class')),
+  relation            TEXT NOT NULL CHECK(relation IN ('gt','eq_ordinal','in_class','not_in_class','anti_class')),
   subject_id           TEXT NOT NULL,
   object_id             TEXT,
   concept                TEXT NOT NULL,

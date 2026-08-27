@@ -83,18 +83,56 @@ class TestEquivalence(unittest.TestCase):
         self.assertEqual(result["classification"], "equivalence")
         self.assertEqual(result["violations"], [])
 
+    def test_anti_class_is_its_own_class_not_a_synonym_for_not_in_class(self):
+        # "not X" and "anti X" are two different equivalence classes when a
+        # human curator has judged the speaker treats them as genuinely
+        # distinct -- so asserting both about the same entity is a real
+        # contradiction (they'd be putting it in two classes at once).
+        events = [ev("not_in_class", "a", event_id="e1"),
+                  ev("anti_class", "a", event_id="e2")]
+        result = classify_equivalence(events)
+        self.assertEqual(result["classification"], "inconsistent")
+        self.assertEqual(
+            result["violations"][0]["conflicting_events"], ["e1", "e2"]
+        )
+
+    def test_three_disjoint_classes_are_fine(self):
+        events = [ev("in_class", "a", event_id="e1"),
+                  ev("not_in_class", "b", event_id="e2"),
+                  ev("anti_class", "c", event_id="e3")]
+        result = classify_equivalence(events)
+        self.assertEqual(result["classification"], "equivalence")
+        self.assertEqual(result["violations"], [])
+
 
 class TestGroupRouting(unittest.TestCase):
     def test_empty_is_no_discourse(self):
         result = classify_group([])
         self.assertEqual(result["classification"], "no_discourse")
 
-    def test_majority_comparative_routes_to_order(self):
-        events = [ev("gt", "a", "b", "e1"), ev("gt", "a", "c", "e2"),
-                  ev("in_class", "a", event_id="e3")]
+    def test_pure_comparative_routes_to_order(self):
+        events = [ev("gt", "a", "b", "e1"), ev("gt", "a", "c", "e2")]
         result = classify_group(events)
         self.assertIn(result["classification"],
                        {"strict_order_total", "strict_order_partial", "weak_order"})
+
+    def test_pure_assignment_routes_to_equivalence(self):
+        events = [ev("in_class", "a", event_id="e1"), ev("not_in_class", "b", event_id="e2")]
+        result = classify_group(events)
+        self.assertEqual(result["classification"], "equivalence")
+
+    def test_mixing_order_and_equivalence_events_is_its_own_finding(self):
+        # A single relation can't be both symmetric (equivalence) and
+        # antisymmetric (order) except trivially -- so a bucket that mixes
+        # gt/eq_ordinal with in_class/not_in_class/anti_class isn't resolved
+        # by majority vote anymore, it's flagged as mixed_relation_types,
+        # even when comparative events outnumber assignment ones 2:1.
+        events = [ev("gt", "a", "b", "e1"), ev("gt", "a", "c", "e2"),
+                  ev("in_class", "a", event_id="e3")]
+        result = classify_group(events)
+        self.assertEqual(result["classification"], "mixed_relation_types")
+        self.assertEqual(set(result["comparative_events"]), {"e1", "e2"})
+        self.assertEqual(result["assignment_events"], ["e3"])
 
 
 if __name__ == "__main__":

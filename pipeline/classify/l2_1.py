@@ -2,7 +2,8 @@
 
 For each (speaker, concept, grammatical_form) bucket, builds a graph from that
 speaker's events and checks it against the formal taxonomy: equivalence,
-strict_order_total/partial, weak_order, no_discourse, inconsistent.
+strict_order_total/partial, weak_order, no_discourse, inconsistent,
+mixed_relation_types.
 
 Two independent axes, never conflated:
   - grammatical_form (noun/adjective) is read straight from the claim -- syntax.
@@ -18,7 +19,11 @@ import networkx as nx
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "concepts.db"
 
 ORDER_RELATIONS = {"gt", "eq_ordinal"}
-EQUIVALENCE_RELATIONS = {"in_class", "not_in_class"}
+# not_in_class ("not X") and anti_class ("anti-X") are kept distinct on purpose --
+# "anti-X" is not derived automatically from "not X", it requires a human to judge
+# the speaker actually treats it as its own class (spec.md L1 event-creation rules),
+# never inferred mechanically. See classify_equivalence for what that buys us.
+EQUIVALENCE_RELATIONS = {"in_class", "not_in_class", "anti_class"}
 
 
 def fetch_event_groups(conn: sqlite3.Connection) -> dict:
@@ -78,7 +83,10 @@ def classify_order(events: list[dict]) -> dict:
 
 
 def classify_equivalence(events: list[dict]) -> dict:
-    """No entity assigned to both in_class and not_in_class (spec.md 3.6)."""
+    """No entity assigned to two different classes -- N-ary, not just in/out
+    (spec.md 3.6). in_class/not_in_class/anti_class are each their own class
+    label; the relation value itself IS the label, compared for equality,
+    not reduced to a boolean."""
     assigned = {}
     violations = []
     universe = set()
@@ -86,14 +94,14 @@ def classify_equivalence(events: list[dict]) -> dict:
     for e in events:
         entity = e["subject_id"]
         universe.add(entity)
-        polarity = e["relation"] == "in_class"
-        if entity in assigned and assigned[entity]["polarity"] != polarity:
+        label = e["relation"]
+        if entity in assigned and assigned[entity]["label"] != label:
             violations.append(
                 {"entity": entity,
                  "conflicting_events": [assigned[entity]["event_id"], e["event_id"]]}
             )
         else:
-            assigned[entity] = {"polarity": polarity, "event_id": e["event_id"]}
+            assigned[entity] = {"label": label, "event_id": e["event_id"]}
 
     classification = "inconsistent" if violations else "equivalence"
     return {"classification": classification, "universe": sorted(universe),
@@ -101,12 +109,30 @@ def classify_equivalence(events: list[dict]) -> dict:
 
 
 def classify_group(events: list[dict]) -> dict:
+    """A single relation cannot be both symmetric (equivalence) and antisymmetric
+    (strict order) except in the empty/degenerate case -- proof: if aRb -> bRa
+    (symmetric) and aRb & bRa -> a=b (antisymmetric), then aRb -> a=b for every
+    pair, so no two distinct entities can be related at all. So when a bucket
+    has BOTH order-type and equivalence-type events, that is not noise to
+    resolve by majority vote -- it IS the finding: this speaker doesn't apply
+    one coherent relation to this concept+form. Surfacing that (not silently
+    picking the majority and discarding the rest) is one of the project's
+    actual goals (spec.md 3.6)."""
     comparative = [e for e in events if e["relation"] in ORDER_RELATIONS]
     assignment = [e for e in events if e["relation"] in EQUIVALENCE_RELATIONS]
 
     if not comparative and not assignment:
         return {"classification": "no_discourse", "universe": [], "violations": []}
-    if len(comparative) >= len(assignment):
+    if comparative and assignment:
+        universe = sorted({e["subject_id"] for e in events} |
+                           {e["object_id"] for e in events if e["object_id"]})
+        return {
+            "classification": "mixed_relation_types", "universe": universe,
+            "violations": [],
+            "comparative_events": [e["event_id"] for e in comparative],
+            "assignment_events": [e["event_id"] for e in assignment],
+        }
+    if comparative:
         return classify_order(comparative)
     return classify_equivalence(assignment)
 

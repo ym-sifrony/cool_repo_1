@@ -43,6 +43,9 @@ SPEECH_VERBS = r"(?:" + "|".join([
     "הסביר", "הסבירה", "מסביר", "מסבירה",
     "הבהיר", "הבהירה", "מבהיר", "מבהירה",
     "השיב", "השיבה", "משיב", "משיבה",
+    # "הדגיש" found on a real headline (Haaretz, 2026-05-01: "'אני ימני',
+    # הדגיש בנט") -- matched nothing before this, same category of gap.
+    "הדגיש", "הדגישה", "מדגיש", "מדגישה",
 ]) + r")"
 
 # A journalist who already named the speaker once often refers back with a
@@ -51,7 +54,9 @@ SPEECH_VERBS = r"(?:" + "|".join([
 PRONOUN_SPEAKERS = r"(?:הוא|היא)"
 
 NAME_AFTER_VERB = r"([א-ת\"'\s]{2,30}?)(?=[,.:\n]|$)"
-NAME_BEFORE_QUOTE = r"([א-ת]{2,15}\s[א-ת']{2,20})"
+# A tracked name can be "first last" or a bare surname (headlines/shorthand
+# routinely say just "בנט", not "נפתלי בנט") -- the second word is optional.
+NAME_BEFORE_QUOTE = r"([א-ת]{2,15}(?:\s[א-ת']{2,20})?)"
 
 # quote, then attribution: "..." אמר X   /   "..." — כך אמר X
 
@@ -67,6 +72,13 @@ ATTR_AFTER_NAME = re.compile(r"^[\s,—-]*" + DISCOURSE_CONNECTOR + SPEECH_VERBS
 ATTR_AFTER_PRONOUN = re.compile(r"^[\s,—-]*" + DISCOURSE_CONNECTOR + PRONOUN_SPEAKERS + r"\s+" + SPEECH_VERBS)
 # attribution, then quote: X: "..."   /   X אמר: "..."
 ATTR_BEFORE_NAME = re.compile(NAME_BEFORE_QUOTE + r"[,:]?\s*(?:" + SPEECH_VERBS + r")?\s*:?\s*$")
+# verb-then-name order ("... אמר בנט: '...'") -- checked BEFORE
+# ATTR_BEFORE_NAME above, since with a bare surname (one word) the optional
+# second-word slot in NAME_BEFORE_QUOTE would otherwise greedily swallow the
+# verb itself as if it were part of the name ("אמר בנט" captured whole,
+# instead of "אמר" as the verb and "בנט" as the name). Found on a real
+# headline (Haaretz, 2026-05-01): "אני ימני", הדגיש בנט.
+ATTR_BEFORE_VERB_NAME = re.compile(SPEECH_VERBS + r"\s+" + NAME_BEFORE_QUOTE + r"[,:]?\s*:?\s*$")
 ATTR_BEFORE_PRONOUN = re.compile(PRONOUN_SPEAKERS + r"[,:]?\s*(?:" + SPEECH_VERBS + r")?\s*:?\s*$")
 
 
@@ -97,10 +109,23 @@ def load_persons(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def resolve_speaker(name_guess: str, name_to_id: dict[str, int]) -> tuple[str, int] | None:
+    """A bare surname (e.g. "בנט") can legitimately fuzzy-match more than one
+    tracked person -- 1,188 rows, surnames repeat. Returning the first match
+    found (previous behavior) silently picked one at random by dict-iteration
+    order; now an exact "first last" match always wins unambiguously, but a
+    fuzzy/substring match only resolves when exactly one person fits. Which
+    of several same-surname people is meant needs the article's context to
+    decide -- an interpretation-stage concern, not something to guess here."""
     name_guess = name_guess.strip()
     for full_name, pid in name_to_id.items():
-        if full_name == name_guess or full_name in name_guess or name_guess in full_name:
+        if full_name == name_guess:
             return full_name, pid
+    fuzzy_matches = {
+        (full_name, pid) for full_name, pid in name_to_id.items()
+        if full_name in name_guess or name_guess in full_name
+    }
+    if len(fuzzy_matches) == 1:
+        return fuzzy_matches.pop()
     return None
 
 
@@ -141,6 +166,14 @@ def _resolve_touching_attribution(
     before = article_text[max(0, start - ATTRIBUTION_WINDOW_CHARS):start]
 
     m = ATTR_AFTER_NAME.match(after)
+    if m:
+        return resolve_speaker(m.group(1), name_to_id) or "unresolved"
+
+    # Checked before ATTR_BEFORE_NAME: with a bare one-word surname, that
+    # pattern's optional second-word slot would otherwise swallow the verb
+    # itself as if it were part of the name (see ATTR_BEFORE_VERB_NAME's
+    # definition above for the real example this was found on).
+    m = ATTR_BEFORE_VERB_NAME.search(before)
     if m:
         return resolve_speaker(m.group(1), name_to_id) or "unresolved"
 

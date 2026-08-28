@@ -48,6 +48,42 @@ class TestPresentTenseVerb(unittest.TestCase):
         c = extract('אביגדור ליברמן: "מנסור עבאס יותר ציוני מסמוטריץ", הוא מסביר.')
         self.assertEqual([(x.attributed_name, x.concept) for x in c], [("אביגדור ליברמן", "ציוני")])
 
+    def test_hidgish_verb(self):
+        # Real headline (Haaretz, 2026-05-01): "'אני ימני', הדגיש בנט" --
+        # "הדגיש" wasn't in SPEECH_VERBS at all before this.
+        c = extract('"מנסור עבאס יותר ציוני מסמוטריץ", הדגיש יאיר גולן.')
+        self.assertEqual([(x.attributed_name, x.concept) for x in c], [("יאיר גולן", "ציוני")])
+
+
+class TestBareSurname(unittest.TestCase):
+    def test_verb_then_surname_before_quote(self):
+        # Real headline (Haaretz, 2026-05-01): "'אני ימני', הדגיש בנט" also
+        # exposed this in the after-quote direction; this is the mirrored
+        # before-quote order. Without ATTR_BEFORE_VERB_NAME checked first,
+        # ATTR_BEFORE_NAME's optional second-word slot swallows the verb
+        # itself as if "אמר ליברמן" were a two-word name.
+        c = extract('בריאיון אמר ליברמן: "מנסור עבאס יותר ציוני מסמוטריץ"')
+        self.assertEqual([(x.attributed_name, x.concept) for x in c], [("אביגדור ליברמן", "ציוני")])
+
+    def test_real_lieberman_on_smotrich(self):
+        # Real quote, Maariv 2021-03-20: "סמוטריץ' הוא לא ימני, הוא פנטי".
+        c = extract('בריאיון האחרון שלו אמר ליברמן: "סמוטריץ הוא לא ימני, הוא פנטי". זו הייתה אמירה חדה')
+        self.assertEqual(
+            [(x.attributed_name, x.concept, x.concept_grammatical_form) for x in c],
+            [("אביגדור ליברמן", "ימני", "noun")],
+        )
+
+    def test_ambiguous_surname_resolves_to_nothing(self):
+        # "גולן" alone fits two different tracked people -- must NOT guess
+        # which one; disambiguating from context is an interpretation-stage
+        # concern (see resolve_speaker's docstring), not this stage's job.
+        ambiguous_names = {**NAME_TO_ID, "משה גולן": 4}
+        c = extract_candidates(
+            'אמר גולן: "מנסור עבאס יותר ציוני מסמוטריץ"',
+            "http://x", "title", "2024-01-01", "web", ambiguous_names, CONCEPTS,
+        )
+        self.assertEqual(c, [])
+
 
 class TestPronounAndCarryForward(unittest.TestCase):
     def test_pronoun_after_established_speaker(self):

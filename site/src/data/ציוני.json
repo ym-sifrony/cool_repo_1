@@ -56,21 +56,43 @@
       "speaker": "יאיר גולן",
       "form": "unknown",
       "classification": "strict_order_partial",
-      "universe": [
-        "בצלאל סמוטריץ'",
-        "מנסור עבאס",
-        "איתמר בן גביר"
-      ],
-      "violation_count": 0
+      "violation_count": 0,
+      "supporting_claims": [
+        {
+          "id": "clm_00001",
+          "speaker": "יאיר גולן",
+          "text_he": "מנסור עבאס יותר ציוני מסמוטריץ', יותר ציוני מבן גביר ויותר ציוני מהחרדים",
+          "context_before": "בכנס יום הדמוקרטיה 2026 באוניברסיטת רייכמן, בשיח עם הסטודנט גיא שלום, אמר גולן:",
+          "context_after": "",
+          "date": "2026-01-22",
+          "grammatical_form": null,
+          "source_medium": "text",
+          "source_platform": "news_site",
+          "source_url": "https://hamal.co.il/main/יאיר-גולן-בעיניי-239552",
+          "source_status": "live"
+        }
+      ]
     },
     {
       "speaker": "בנימין גנץ",
       "form": "unknown",
       "classification": "equivalence",
-      "universe": [
-        "מנסור עבאס"
-      ],
-      "violation_count": 0
+      "violation_count": 0,
+      "supporting_claims": [
+        {
+          "id": "clm_00002",
+          "speaker": "בנימין גנץ",
+          "text_he": "לבן גביר מצביעים ציוניים רבים, מנסור עבאס הוא לא ציוני",
+          "context_before": "בתשובה לשאלת העיתונאי יהודה שלזינגר:",
+          "context_after": "",
+          "date": "2026-01-19",
+          "grammatical_form": null,
+          "source_medium": "video",
+          "source_platform": "instagram",
+          "source_url": "https://www.instagram.com/p/DTsVSCNCv5I/",
+          "source_status": "live"
+        }
+      ]
     }
   ]
 }

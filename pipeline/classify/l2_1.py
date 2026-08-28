@@ -85,7 +85,7 @@ def classify_order(events: list[dict]) -> dict:
             classification = "strict_order_partial"
 
     return {"classification": classification, "universe": sorted(universe),
-            "violations": violations}
+            "violations": violations, "event_ids": [e["event_id"] for e in events]}
 
 
 def classify_equivalence(events: list[dict]) -> dict:
@@ -111,7 +111,7 @@ def classify_equivalence(events: list[dict]) -> dict:
 
     classification = "inconsistent" if violations else "equivalence"
     return {"classification": classification, "universe": sorted(universe),
-            "violations": violations}
+            "violations": violations, "event_ids": [e["event_id"] for e in events]}
 
 
 def classify_group(events: list[dict]) -> dict:
@@ -128,13 +128,14 @@ def classify_group(events: list[dict]) -> dict:
     assignment = [e for e in events if e["relation"] in EQUIVALENCE_RELATIONS]
 
     if not comparative and not assignment:
-        return {"classification": "no_discourse", "universe": [], "violations": []}
+        return {"classification": "no_discourse", "universe": [], "violations": [],
+                "event_ids": []}
     if comparative and assignment:
         universe = sorted({e["subject_id"] for e in events} |
                            {e["object_id"] for e in events if e["object_id"]})
         return {
             "classification": "mixed_relation_types", "universe": universe,
-            "violations": [],
+            "violations": [], "event_ids": [e["event_id"] for e in events],
             "comparative_events": [e["event_id"] for e in comparative],
             "assignment_events": [e["event_id"] for e in assignment],
         }

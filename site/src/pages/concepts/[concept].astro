@@ -28,6 +28,19 @@ const classificationLabel: Record<string, string> = {
   inconsistent: "חוסר עקביות",
   mixed_relation_types: "מבנה מעורב (גם סדר וגם שקילות)",
 };
+
+// Mechanical explanation of WHAT WAS CHECKED, not an interpretive verdict --
+// same neutrality principle as everywhere else (spec.md): describe the test,
+// let the quotes below speak for the conclusion.
+const classificationExplanation: Record<string, string> = {
+  equivalence: "אף ישות לא שויכה לשתי מחלקות שונות.",
+  strict_order_total: "כל הזוגות ביקום המצומצם הושוו, בלי סתירה.",
+  strict_order_partial: "חלק מהזוגות הושוו בלי סתירה — לא כל הזוגות ביקום נבדקו.",
+  weak_order: "יש השוואות וגם תיקו מוצהר בין חלק מהזוגות, בלי סתירה.",
+  no_discourse: "אין עדיין מספיק טענות שהפכו לאירועים בגרף.",
+  inconsistent: "נמצאה סתירה ממשית — ר' הציטוטים הסותרים למטה.",
+  mixed_relation_types: "אותו דובר השתמש גם בניסוח השוואתי וגם בניסוח קטגורי על המושג הזה — לא סתירה על ישות בודדת, אלא היעדר מבנה יחס אחיד.",
+};
 ---
 
 <html lang="he" dir="rtl">
@@ -74,6 +87,31 @@ const classificationLabel: Record<string, string> = {
         font-size: 0.9rem;
       }
       th { background: #f5f5f5; }
+      .classification-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+      }
+      .classification-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
+      }
+      .speaker-name { font-weight: bold; font-size: 1.05rem; }
+      .badge-warn { background: #fde2e2; color: #7a1f1f; }
+      .explanation {
+        color: #444;
+        font-size: 0.9rem;
+        margin: 0.25rem 0 0.75rem;
+      }
+      .classification-card .claim {
+        margin-bottom: 0.5rem;
+      }
+      .classification-card .claim:last-child {
+        margin-bottom: 0;
+      }
     </style>
   </head>
   <body>
@@ -83,21 +121,32 @@ const classificationLabel: Record<string, string> = {
 
     <section>
       <h2>סיווג לפי דובר (L2.1)</h2>
-      <table>
-        <thead>
-          <tr><th>דובר</th><th>סיווג</th><th>יקום</th><th>הפרות</th></tr>
-        </thead>
-        <tbody>
-          {classifications.map((c: any) => (
-            <tr>
-              <td>{c.speaker}</td>
-              <td>{classificationLabel[c.classification] ?? c.classification}</td>
-              <td>{c.universe.join(", ")}</td>
-              <td>{c.violation_count}</td>
-            </tr>
+      {classifications.map((c: any) => (
+        <div class="classification-card">
+          <div class="classification-head">
+            <span class="speaker-name">{c.speaker}</span>
+            <span class="badge">{classificationLabel[c.classification] ?? c.classification}</span>
+            {c.violation_count > 0 && <span class="badge badge-warn">{c.violation_count} הפרות</span>}
+          </div>
+          <p class="explanation">
+            {classificationExplanation[c.classification] ?? ""}
+          </p>
+          {c.supporting_claims.map((sc: any) => (
+            <div class="claim">
+              <blockquote>
+                {sc.context_before && <span class="meta">{sc.context_before} </span>}
+                &ldquo;{sc.text_he}&rdquo;
+              </blockquote>
+              <div class="meta">
+                <span class="badge">{sc.date}</span>
+                <span class="badge">{sc.source_medium}/{sc.source_platform}</span>
+                {" "}
+                <a href={sc.source_url} target="_blank" rel="noopener">מקור</a>
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      ))}
     </section>
 
     <section>

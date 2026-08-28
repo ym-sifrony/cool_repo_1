@@ -153,5 +153,43 @@ class TestParticipleFeminineForm(unittest.TestCase):
         )
 
 
+class TestAbstractNounForm(unittest.TestCase):
+    """The abstract/quality noun (e.g. "אידיאולוגיה") is a distinct word from
+    the adjective's inflections -- inflected_forms alone never generates it
+    (it only produces "אידיאולוגיות", the fem-plural adjective form, not the
+    "-יה" abstract noun). Found on a real quote (Yair Lapid, on "אידיאולוגי"),
+    which uses BOTH the adjective and the abstract noun in the same sentence."""
+
+    def test_lapid_ideological_center_both_forms_in_one_claim(self):
+        self.assertEqual(
+            forms(
+                "המרכז הישראלי של היום הוא אידיאולוגי יותר ממה שהיה בעבר. "
+                "זו אידיאולוגיה של שמירה על הדמוקרטיה ועל שלטון החוק, "
+                "והיא חזקה לא פחות מהאידיאולוגיה של הקצוות.",
+                "אידיאולוגי",
+            ),
+            [
+                ("אידיאולוגי", "adjective"),
+                ("אידיאולוגיה", "noun"),
+                ("אידיאולוגיה", "noun"),
+            ],
+        )
+
+    def test_comparative_marker_on_the_noun_itself_stays_noun(self):
+        # "יותר דמוקרטיה" (more democracy, a quantity of the noun) must not
+        # be mistagged adjective the way "יותר דמוקרטי" (more democratic) is
+        # -- the abstract-noun check has to run before the comparative check.
+        self.assertEqual(
+            forms("אנחנו צריכים יותר דמוקרטיה", "דמוקרטי"),
+            [("דמוקרטיה", "noun")],
+        )
+
+    def test_tzionut_not_the_auto_generated_tzioniyot(self):
+        self.assertEqual(
+            forms("זו לא ציונות אמיתית", "ציוני"),
+            [("ציונות", "noun")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

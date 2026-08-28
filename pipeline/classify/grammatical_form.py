@@ -42,6 +42,23 @@ CONSTRUCT_PLURAL_HEADS = {
 
 SOFIT_TO_REGULAR = {"ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ"}
 
+# Abstract/quality noun for each concept -- e.g. "אידיאולוגי" (adjective) vs
+# "אידיאולוגיה" (the noun, ideology). Deliberately NOT derived by a suffix
+# rule the way plural/gender inflection above is: some concepts really are
+# "stem+יות" (already covered by inflected_forms, e.g. מוסרי->מוסריות --
+# listing those here too would be redundant, so they're left out), some take
+# the borrowed "-יה" pattern inflected_forms never generates (דמוקרטי-
+# >דמוקרטיה, אידיאולוגי->אידיאולוגיה), and some are fully irregular
+# (חופשי->חופש, ציוני->ציונות not the auto-generated "ציוניות"). Verified by
+# hand per concept, same "gilui munah-netunim" principle as
+# CONSTRUCT_PLURAL_HEADS -- expanded from real data, not guessed morphology.
+ABSTRACT_NOUN_FORMS: dict[str, str] = {
+    "ציוני": "ציונות",
+    "חופשי": "חופש",
+    "דמוקרטי": "דמוקרטיה",
+    "אידיאולוגי": "אידיאולוגיה",
+}
+
 
 def _regularize_final_letter(stem: str) -> str:
     """Hebrew final-letter forms (ך/ם/ן/ף/ץ) are only valid at the actual end
@@ -99,7 +116,10 @@ def _strip_prefix(word: str, target: str) -> bool:
 
 
 def find_occurrences(text: str, concept: str) -> list[Occurrence]:
+    abstract_noun = ABSTRACT_NOUN_FORMS.get(concept)
     forms = inflected_forms(concept)
+    if abstract_noun and abstract_noun not in forms:
+        forms = sorted({*forms, abstract_noun}, key=len, reverse=True)
     # allow up to 3 glued prefix letters before the concept form itself (ה/ו/ב/כ/ל/מ/ש)
     pattern = re.compile(
         r"(?<!\S)([" + PREFIX_CHARS + r"]{0,3})(" + "|".join(re.escape(f) for f in forms)
@@ -113,6 +133,17 @@ def find_occurrences(text: str, concept: str) -> list[Occurrence]:
         after_words = text[end:].split()
         before_word = before_words[-1] if before_words else ""
         prefix, matched_word = match.group(1), match.group(2)
+
+        # The abstract noun is a distinct word, not a context-dependent
+        # inflection of the adjective -- it's always a noun regardless of
+        # what precedes it (unlike, say, "יותר" which normally signals the
+        # adjective form). Must come before the comparative check below, or
+        # "יותר דמוקרטיה" (more democracy, a noun) would be mistagged
+        # adjective the same way "יותר דמוקרטי" (more democratic) is.
+        if matched_word == abstract_noun:
+            results.append(Occurrence(matched_word, start, "noun",
+                                       "curated abstract/quality noun form of the concept"))
+            continue
 
         if _strip_prefix(before_word, "יותר") or _strip_prefix(before_word, "הכי"):
             results.append(Occurrence(matched_word, start, "adjective",

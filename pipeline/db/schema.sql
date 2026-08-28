@@ -63,6 +63,21 @@ CREATE TABLE IF NOT EXISTS claims (
   visible                BOOLEAN NOT NULL DEFAULT 1
 );
 
+-- Static relationships between the CONCEPTS themselves (vocabulary-level,
+-- curated by hand) -- distinct from events.relation, which records what a
+-- SPEAKER asserted about specific entities for one concept. This table never
+-- feeds a classification; it's descriptive metadata about the concept list
+-- (e.g. "טוב"/"רע" are antonyms), useful for grouping/UI, not for judging
+-- consistency.
+CREATE TABLE IF NOT EXISTS concept_relations (
+  concept_a   TEXT NOT NULL,
+  concept_b   TEXT NOT NULL,
+  relation    TEXT NOT NULL CHECK(relation IN ('antonym','synonym','related')),
+  note        TEXT,
+  PRIMARY KEY (concept_a, concept_b, relation),
+  CHECK (concept_a < concept_b)
+);
+
 -- L2.1: events (structured comparisons/assignments parsed out of a claim; graph edges)
 
 CREATE TABLE IF NOT EXISTS events (

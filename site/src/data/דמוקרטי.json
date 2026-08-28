@@ -29,10 +29,22 @@
       "speaker": "מירב כהן",
       "form": "unknown",
       "classification": "equivalence",
-      "universe": [
-        "הליכוד"
-      ],
-      "violation_count": 0
+      "violation_count": 0,
+      "supporting_claims": [
+        {
+          "id": "clm_00003",
+          "speaker": "מירב כהן",
+          "text_he": "מפלגת הליכוד, במהלך לא מוסרי ולא דמוקרטי, ניסתה להקשות על קשישים בבתי אבות לממש את זכותם הדמוקרטית ולהצביע בבחירות לכנסת.",
+          "context_before": "",
+          "context_after": "אחרי מאבק ציבורי ומשפטי נמצא מסלול עוקף שיאפשר בכל זאת להציב קלפיות בחלק מהמוסדות.",
+          "date": "2026-08-19",
+          "grammatical_form": null,
+          "source_medium": "video",
+          "source_platform": "facebook",
+          "source_url": "https://www.facebook.com/MeiravCohen2019/videos/2234264994078892/",
+          "source_status": "live"
+        }
+      ]
     }
   ]
 }

@@ -3,12 +3,10 @@ read at build time. The site never queries SQLite directly -- this is the one
 bridge between the DB (never committed, .gitignore'd) and the static files
 that ship in the build.
 
-Repo layout decided later than this comment originally said: one repo
-(pipeline/ + site/ together), kept Private on GitHub -- not the earlier
-two-repo private-pipeline/public-site split. The deployed SITE is still
-fully public (via Vercel/Cloudflare Pages reading the private repo with
-read-only access); it's the source repo that stays closed. See spec.md's
-security section.
+Repo layout: one repo (pipeline/ + site/ together), Public on GitHub -- not
+the earlier two-repo private-pipeline/public-site split. Both the source repo
+and the deployed site are public; the DB itself stays out of git via
+.gitignore regardless. See spec.md's security section.
 """
 import json
 import sqlite3
@@ -75,18 +73,34 @@ def export_concept(conn: sqlite3.Connection, concept: str) -> dict:
          "subject": entity_label(conn, r[3]), "object": entity_label(conn, r[4])}
         for r in events_rows
     ]
+    event_id_to_claim_id = {r[0]: r[1] for r in events_rows}
+    claims_by_id = {c["id"]: c for c in claims}
 
     # visible_only=True: a classification must never rest on a claim the
     # reader can't see -- same reasoning as the claims/events filters above.
-    classifications = [
-        {
+    # supporting_claims: the actual quotes behind a classification, not just
+    # the "universe" entity list -- resolved via event_ids (which l2_1.py
+    # attaches to every classify_* result) -> claim_id -> the claim itself.
+    # Deduped by claim_id since one claim can produce more than one event
+    # (e.g. Golan's single quote comparing Abbas to both Smotrich and Ben
+    # Gvir is two events from the same claim).
+    classifications = []
+    for c in classify_all(conn, visible_only=True):
+        if c["concept"] != concept:
+            continue
+        seen_claim_ids: set[str] = set()
+        supporting_claims = []
+        for event_id in c.get("event_ids", []):
+            claim_id = event_id_to_claim_id.get(event_id)
+            if claim_id and claim_id not in seen_claim_ids:
+                seen_claim_ids.add(claim_id)
+                supporting_claims.append(claims_by_id[claim_id])
+        classifications.append({
             "speaker": entity_label(conn, f"person:{c['person_id']}"),
             "form": c["form"], "classification": c["classification"],
-            "universe": [entity_label(conn, u) for u in c["universe"]],
             "violation_count": len(c["violations"]),
-        }
-        for c in classify_all(conn, visible_only=True) if c["concept"] == concept
-    ]
+            "supporting_claims": supporting_claims,
+        })
 
     return {"concept": concept, "claims": claims, "events": events,
             "classifications": classifications}

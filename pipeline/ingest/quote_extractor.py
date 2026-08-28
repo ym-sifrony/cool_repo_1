@@ -1,7 +1,8 @@
 """L1 rule 2 in code: a quote is only admissible if it's in explicit quotation
-marks. Regex finds quote+attribution pairs; speaker resolution against `persons`
-and concept filtering happen after, so a candidate only survives if BOTH the
-speaker and the concept are ones we actually track.
+marks. Regex finds each quote span, then resolves who said it; speaker
+resolution against `persons` and concept filtering happen after, so a
+candidate only survives if BOTH the speaker and the concept are ones we
+actually track.
 
 Candidates always land in review_queue/candidates.json with `approved: false`.
 Nothing here writes to `claims`/`events` -- pipeline/review/apply_approved.py
@@ -19,21 +20,66 @@ from grammatical_form import claim_level_form, find_occurrences  # noqa: E402
 
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "concepts.db"
 CONTEXT_WINDOW_CHARS = 120
+# How far around a quote to look for its attribution (verb/name/pronoun).
+ATTRIBUTION_WINDOW_CHARS = 60
 
 # Hebrew quotation marks in the wild: straight ", curly “ ”, gershayim ״
 QUOTE_CHARS = r"[\"“”״]"
-SPEECH_VERBS = r"(?:אמר|אמרה|הצהיר|הצהירה|טען|טענה|כתב|כתבה|ציין|ציינה|הוסיף|הוסיפה|מסר|מסרה)"
+QUOTE_SPAN = re.compile(QUOTE_CHARS + r"([^\"“”״]{10,400})" + QUOTE_CHARS)
+
+# Both past tense (classic reported speech: "אמר X") and present/benoni tense
+# (common in Hebrew news narration: X מסביר, "..."). The present-tense forms
+# were missing entirely -- found on a real article (Lieberman, Maariv
+# 2021-03-20) that used ONLY "מסביר" and matched nothing at all, not a
+# hypothetical gap.
+SPEECH_VERBS = r"(?:" + "|".join([
+    "אמר", "אמרה", "אומר", "אומרת",
+    "הצהיר", "הצהירה", "מצהיר", "מצהירה",
+    "טען", "טענה", "טוען", "טוענת",
+    "כתב", "כתבה", "כותב", "כותבת",
+    "ציין", "ציינה", "מציין", "מציינת",
+    "הוסיף", "הוסיפה", "מוסיף", "מוסיפה",
+    "מסר", "מסרה", "מוסר", "מוסרת",
+    "הסביר", "הסבירה", "מסביר", "מסבירה",
+    "הבהיר", "הבהירה", "מבהיר", "מבהירה",
+    "השיב", "השיבה", "משיב", "משיבה",
+    # "הדגיש" found on a real headline (Haaretz, 2026-05-01: "'אני ימני',
+    # הדגיש בנט") -- matched nothing before this, same category of gap.
+    "הדגיש", "הדגישה", "מדגיש", "מדגישה",
+]) + r")"
+
+# A journalist who already named the speaker once often refers back with a
+# bare pronoun for later quotes in the same piece ("הוא מסביר", not repeating
+# the name) -- same real article, not hypothetical.
+PRONOUN_SPEAKERS = r"(?:הוא|היא)"
+
+NAME_AFTER_VERB = r"([א-ת\"'\s]{2,30}?)(?=[,.:\n]|$)"
+# A tracked name can be "first last" or a bare surname (headlines/shorthand
+# routinely say just "בנט", not "נפתלי בנט") -- the second word is optional.
+NAME_BEFORE_QUOTE = r"([א-ת]{2,15}(?:\s[א-ת']{2,20})?)"
 
 # quote, then attribution: "..." אמר X   /   "..." — כך אמר X
-QUOTE_THEN_ATTR = re.compile(
-    QUOTE_CHARS + r"([^\"“”״]{10,400})" + QUOTE_CHARS
-    + r"[\s,—-]*" + SPEECH_VERBS + r"\s+([א-ת\"'\s]{2,30}?)(?=[,.:\n]|$)"
-)
+
+# Optional discourse connector between the dash and the verb -- "..." — כך
+# אמר X. Pre-existing gap: [\s,—-]* alone never covered כ/ך (not whitespace
+# or dash), so this documented pattern (module docstring, "quote, then
+# attribution") never actually matched anything even before this file's
+# broader rewrite -- caught by testing the documented example directly, not
+# a hypothetical.
+DISCOURSE_CONNECTOR = r"(?:כך\s+)?"
+
+ATTR_AFTER_NAME = re.compile(r"^[\s,—-]*" + DISCOURSE_CONNECTOR + SPEECH_VERBS + r"\s+" + NAME_AFTER_VERB)
+ATTR_AFTER_PRONOUN = re.compile(r"^[\s,—-]*" + DISCOURSE_CONNECTOR + PRONOUN_SPEAKERS + r"\s+" + SPEECH_VERBS)
 # attribution, then quote: X: "..."   /   X אמר: "..."
-ATTR_THEN_QUOTE = re.compile(
-    r"([א-ת]{2,15}\s[א-ת']{2,20})[,:]?\s*(?:" + SPEECH_VERBS + r")?\s*:?\s*"
-    + QUOTE_CHARS + r"([^\"“”״]{10,400})" + QUOTE_CHARS
-)
+ATTR_BEFORE_NAME = re.compile(NAME_BEFORE_QUOTE + r"[,:]?\s*(?:" + SPEECH_VERBS + r")?\s*:?\s*$")
+# verb-then-name order ("... אמר בנט: '...'") -- checked BEFORE
+# ATTR_BEFORE_NAME above, since with a bare surname (one word) the optional
+# second-word slot in NAME_BEFORE_QUOTE would otherwise greedily swallow the
+# verb itself as if it were part of the name ("אמר בנט" captured whole,
+# instead of "אמר" as the verb and "בנט" as the name). Found on a real
+# headline (Haaretz, 2026-05-01): "אני ימני", הדגיש בנט.
+ATTR_BEFORE_VERB_NAME = re.compile(SPEECH_VERBS + r"\s+" + NAME_BEFORE_QUOTE + r"[,:]?\s*:?\s*$")
+ATTR_BEFORE_PRONOUN = re.compile(PRONOUN_SPEAKERS + r"[,:]?\s*(?:" + SPEECH_VERBS + r")?\s*:?\s*$")
 
 
 @dataclass
@@ -63,10 +109,23 @@ def load_persons(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 def resolve_speaker(name_guess: str, name_to_id: dict[str, int]) -> tuple[str, int] | None:
+    """A bare surname (e.g. "בנט") can legitimately fuzzy-match more than one
+    tracked person -- 1,188 rows, surnames repeat. Returning the first match
+    found (previous behavior) silently picked one at random by dict-iteration
+    order; now an exact "first last" match always wins unambiguously, but a
+    fuzzy/substring match only resolves when exactly one person fits. Which
+    of several same-surname people is meant needs the article's context to
+    decide -- an interpretation-stage concern, not something to guess here."""
     name_guess = name_guess.strip()
     for full_name, pid in name_to_id.items():
-        if full_name == name_guess or full_name in name_guess or name_guess in full_name:
+        if full_name == name_guess:
             return full_name, pid
+    fuzzy_matches = {
+        (full_name, pid) for full_name, pid in name_to_id.items()
+        if full_name in name_guess or name_guess in full_name
+    }
+    if len(fuzzy_matches) == 1:
+        return fuzzy_matches.pop()
     return None
 
 
@@ -92,36 +151,98 @@ def surrounding_context(article_text: str, span: tuple[int, int]) -> tuple[str, 
     return before, after
 
 
+def _resolve_touching_attribution(
+    article_text: str, span: tuple[int, int], name_to_id: dict[str, int]
+) -> tuple[str, int] | None | str:
+    """Attribution that directly touches this quote (name or pronoun, before
+    or after). Returns a resolved (name, person_id), the sentinel "pronoun"
+    (caller substitutes the last resolved speaker), the sentinel "unresolved"
+    (a NAME was found but isn't one of our tracked persons -- a real,
+    different speaker we just don't track, so the caller must NOT fall back
+    to the previous speaker), or None (no attribution touches this quote at
+    all, so the caller may consider carry-forward)."""
+    start, end = span
+    after = article_text[end:end + ATTRIBUTION_WINDOW_CHARS]
+    before = article_text[max(0, start - ATTRIBUTION_WINDOW_CHARS):start]
+
+    m = ATTR_AFTER_NAME.match(after)
+    if m:
+        return resolve_speaker(m.group(1), name_to_id) or "unresolved"
+
+    # Checked before ATTR_BEFORE_NAME: with a bare one-word surname, that
+    # pattern's optional second-word slot would otherwise swallow the verb
+    # itself as if it were part of the name (see ATTR_BEFORE_VERB_NAME's
+    # definition above for the real example this was found on).
+    m = ATTR_BEFORE_VERB_NAME.search(before)
+    if m:
+        return resolve_speaker(m.group(1), name_to_id) or "unresolved"
+
+    m = ATTR_BEFORE_NAME.search(before)
+    if m:
+        return resolve_speaker(m.group(1), name_to_id) or "unresolved"
+
+    if ATTR_AFTER_PRONOUN.match(after) or ATTR_BEFORE_PRONOUN.search(before):
+        return "pronoun"
+
+    return None
+
+
 def extract_candidates(article_text: str, article_url: str, article_title: str,
                         claim_date: str | None, source_platform: str,
                         name_to_id: dict[str, int], concepts: list[str]) -> list[Candidate]:
     candidates = []
-    for pattern in (QUOTE_THEN_ATTR, ATTR_THEN_QUOTE):
-        for match in pattern.finditer(article_text):
-            groups = match.groups()
-            quote, name_guess = (groups[0], groups[1]) if pattern is QUOTE_THEN_ATTR else (groups[1], groups[0])
-            quote = quote.strip()
+    last_speaker: tuple[str, int] | None = None
+    last_quote_end: int | None = None
 
-            resolved = resolve_speaker(name_guess, name_to_id)
-            if not resolved:
-                continue
-            full_name, person_id = resolved
+    for match in QUOTE_SPAN.finditer(article_text):
+        quote = match.group(1).strip()
+        start, end = match.span()
 
-            hit_concepts = matching_concepts(quote, concepts)
-            if not hit_concepts:
-                continue
+        attribution = _resolve_touching_attribution(article_text, (start, end), name_to_id)
 
-            before, after = surrounding_context(article_text, match.span())
+        if attribution == "unresolved":
+            # A real, named attribution we just don't track -- breaks the
+            # carry-forward chain so a LATER pronoun-only quote doesn't get
+            # wrongly attributed to whoever spoke before this interruption.
+            last_speaker = None
+            last_quote_end = None
+            continue
 
-            for concept in hit_concepts:
-                form = claim_level_form(find_occurrences(quote, concept))
-                candidates.append(Candidate(
-                    text_he=quote, context_before=before, context_after=after,
-                    attributed_name=full_name, person_id=person_id, concept=concept,
-                    concept_grammatical_form=form, claim_date=claim_date,
-                    source_platform=source_platform, article_url=article_url,
-                    article_title=article_title,
-                ))
+        if attribution == "pronoun":
+            speaker = last_speaker
+        elif attribution is not None:
+            speaker = attribution
+        elif (last_speaker is not None and last_quote_end is not None
+              and article_text[last_quote_end:start].strip("\n\t .,—-") == ""):
+            # No attribution at all touches this quote, but it directly
+            # follows the last (attributed) one with nothing but
+            # whitespace/punctuation between -- consecutive quotes from one
+            # speaker, attributed once (real pattern: Lieberman, Maariv
+            # 2021-03-20, second quote has zero attribution of its own).
+            speaker = last_speaker
+        else:
+            speaker = None
+
+        if speaker is None:
+            continue
+        full_name, person_id = speaker
+        last_speaker, last_quote_end = speaker, end
+
+        hit_concepts = matching_concepts(quote, concepts)
+        if not hit_concepts:
+            continue
+
+        before, after = surrounding_context(article_text, (start, end))
+
+        for concept in hit_concepts:
+            form = claim_level_form(find_occurrences(quote, concept))
+            candidates.append(Candidate(
+                text_he=quote, context_before=before, context_after=after,
+                attributed_name=full_name, person_id=person_id, concept=concept,
+                concept_grammatical_form=form, claim_date=claim_date,
+                source_platform=source_platform, article_url=article_url,
+                article_title=article_title,
+            ))
     return candidates
 
 

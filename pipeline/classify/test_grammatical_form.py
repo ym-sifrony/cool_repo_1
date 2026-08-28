@@ -153,5 +153,76 @@ class TestParticipleFeminineForm(unittest.TestCase):
         )
 
 
+class TestAbstractNounForm(unittest.TestCase):
+    """The abstract/quality noun (e.g. "אידיאולוגיה") is a distinct word from
+    the adjective's inflections -- inflected_forms alone never generates it
+    (it only produces "אידיאולוגיות", the fem-plural adjective form, not the
+    "-יה" abstract noun). Found on a real quote (Yair Lapid, on "אידיאולוגי"),
+    which uses BOTH the adjective and the abstract noun in the same sentence."""
+
+    def test_lapid_ideological_center_both_forms_in_one_claim(self):
+        self.assertEqual(
+            forms(
+                "המרכז הישראלי של היום הוא אידיאולוגי יותר ממה שהיה בעבר. "
+                "זו אידיאולוגיה של שמירה על הדמוקרטיה ועל שלטון החוק, "
+                "והיא חזקה לא פחות מהאידיאולוגיה של הקצוות.",
+                "אידיאולוגי",
+            ),
+            [
+                ("אידיאולוגי", "adjective"),
+                ("אידיאולוגיה", "noun"),
+                ("אידיאולוגיה", "noun"),
+            ],
+        )
+
+    def test_comparative_marker_on_the_noun_itself_stays_noun(self):
+        # "יותר דמוקרטיה" (more democracy, a quantity of the noun) must not
+        # be mistagged adjective the way "יותר דמוקרטי" (more democratic) is
+        # -- the abstract-noun check has to run before the comparative check.
+        self.assertEqual(
+            forms("אנחנו צריכים יותר דמוקרטיה", "דמוקרטי"),
+            [("דמוקרטיה", "noun")],
+        )
+
+    def test_tzionut_not_the_auto_generated_tzioniyot(self):
+        self.assertEqual(
+            forms("זו לא ציונות אמיתית", "ציוני"),
+            [("ציונות", "noun")],
+        )
+
+    def test_gaanut_not_the_auto_generated_gaaniyot(self):
+        # same "-ני" gap as ציוני->ציונות: inflected_forms would only ever
+        # generate "גזעניות" (the real fem-plural adjective, "ישיבות
+        # גזעניות" style -- verified against real usage, not this concept's
+        # abstract noun), never "גזענות" itself.
+        self.assertEqual(
+            forms("זו הצהרה גזענות מובהקת", "גזעני"),
+            [("גזענות", "noun")],
+        )
+
+    def test_yahadut_irregular_noun_not_yehudiyot(self):
+        self.assertEqual(
+            forms("השאלה מה זו יהדות בכלל", "יהודי"),
+            [("יהדות", "noun")],
+        )
+
+    def test_yamin_with_double_glued_prefix(self):
+        # Real quote (Bezalel Smotrich, mida.org.il 2015): "שבימין" is
+        # ש+ב glued directly onto "ימין" -- previously invisible to
+        # find_occurrences entirely, since "ימין" wasn't a known form of
+        # the concept "ימני" at all, regardless of prefix handling.
+        self.assertEqual(
+            forms("לי חשוב לקבע תודעה שבימין זה טאבו", "ימני"),
+            [("ימין", "noun")],
+        )
+
+    def test_smol_with_glued_prefix(self):
+        # Real quote (Benjamin Netanyahu, 1997): "השמאל" = ה glued onto "שמאל".
+        self.assertEqual(
+            forms("אנשי השמאל שכחו מה זה להיות יהודים", "שמאלי"),
+            [("שמאל", "noun")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

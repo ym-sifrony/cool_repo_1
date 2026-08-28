@@ -3,12 +3,10 @@ read at build time. The site never queries SQLite directly -- this is the one
 bridge between the DB (never committed, .gitignore'd) and the static files
 that ship in the build.
 
-Repo layout decided later than this comment originally said: one repo
-(pipeline/ + site/ together), kept Private on GitHub -- not the earlier
-two-repo private-pipeline/public-site split. The deployed SITE is still
-fully public (via Vercel/Cloudflare Pages reading the private repo with
-read-only access); it's the source repo that stays closed. See spec.md's
-security section.
+Repo layout: one repo (pipeline/ + site/ together), Public on GitHub -- not
+the earlier two-repo private-pipeline/public-site split. Both the source repo
+and the deployed site are public; the DB itself stays out of git via
+.gitignore regardless. See spec.md's security section.
 """
 import json
 import sqlite3

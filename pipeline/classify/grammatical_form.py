@@ -57,6 +57,24 @@ ABSTRACT_NOUN_FORMS: dict[str, str] = {
     "חופשי": "חופש",
     "דמוקרטי": "דמוקרטיה",
     "אידיאולוגי": "אידיאולוגיה",
+    "גזעני": "גזענות",
+    "לאומני": "לאומנות",
+    "מתון": "מתינות",
+    "ישר": "יושר",
+    "יהודי": "יהדות",
+    "זהותי": "זהות",
+    "מושחת": "שחיתות",
+    "צודק": "צדק",
+    # "ימין"/"שמאל" also mean physical direction, so this trades precision
+    # for recall -- accepted deliberately, same as load_persons' wider-pool
+    # tradeoff (grammatical_form.py, quote_extractor.py): real political
+    # discourse overwhelmingly uses these as the camp-noun with a glued
+    # prefix ("שבימין", "אנשי השמאל", "ממפלגות השמאל" -- all real quotes
+    # found and previously invisible to find_occurrences entirely, since
+    # PREFIX_CHARS handling only helps once the base form itself is known).
+    # Human review in review_queue/candidates.json is the actual safeguard.
+    "ימני": "ימין",
+    "שמאלי": "שמאל",
 }
 
 

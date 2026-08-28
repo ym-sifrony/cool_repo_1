@@ -190,6 +190,39 @@ class TestAbstractNounForm(unittest.TestCase):
             [("ציונות", "noun")],
         )
 
+    def test_gaanut_not_the_auto_generated_gaaniyot(self):
+        # same "-ני" gap as ציוני->ציונות: inflected_forms would only ever
+        # generate "גזעניות" (the real fem-plural adjective, "ישיבות
+        # גזעניות" style -- verified against real usage, not this concept's
+        # abstract noun), never "גזענות" itself.
+        self.assertEqual(
+            forms("זו הצהרה גזענות מובהקת", "גזעני"),
+            [("גזענות", "noun")],
+        )
+
+    def test_yahadut_irregular_noun_not_yehudiyot(self):
+        self.assertEqual(
+            forms("השאלה מה זו יהדות בכלל", "יהודי"),
+            [("יהדות", "noun")],
+        )
+
+    def test_yamin_with_double_glued_prefix(self):
+        # Real quote (Bezalel Smotrich, mida.org.il 2015): "שבימין" is
+        # ש+ב glued directly onto "ימין" -- previously invisible to
+        # find_occurrences entirely, since "ימין" wasn't a known form of
+        # the concept "ימני" at all, regardless of prefix handling.
+        self.assertEqual(
+            forms("לי חשוב לקבע תודעה שבימין זה טאבו", "ימני"),
+            [("ימין", "noun")],
+        )
+
+    def test_smol_with_glued_prefix(self):
+        # Real quote (Benjamin Netanyahu, 1997): "השמאל" = ה glued onto "שמאל".
+        self.assertEqual(
+            forms("אנשי השמאל שכחו מה זה להיות יהודים", "שמאלי"),
+            [("שמאל", "noun")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
